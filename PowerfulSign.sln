@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30907.101
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PowerfulSign", "PowerfulSign.csproj", "{AF887343-1E0F-4A99-96C3-30153E21BCDD}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{AF887343-1E0F-4A99-96C3-30153E21BCDD}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AF887343-1E0F-4A99-96C3-30153E21BCDD}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AF887343-1E0F-4A99-96C3-30153E21BCDD}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AF887343-1E0F-4A99-96C3-30153E21BCDD}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {EB097A66-B5E0-4677-9C45-8A3BD22A2902}
+	EndGlobalSection
+EndGlobal
