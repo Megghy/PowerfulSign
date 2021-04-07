@@ -1,19 +1,21 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.Xna.Framework;
 using Terraria;
 using TShockAPI;
 using TShockAPI.DB;
-using System.Collections.Generic;
-using System.Threading.Tasks;
+using UnifiedEconomyFramework;
 
 namespace PowerfulSign
 {
     static class Utils
     {
+        #region PSSign辅助工具
         public static void ImportSign()
         {
-            TShock.Log.ConsoleInfo("<PowerfulSign> 首次进入地图, 正在导入本地标牌数据...");
+            TShock.Log.ConsoleInfo("[C/66D093:<PowerfulSign>] 首次进入地图, 正在导入本地标牌数据...");
             DB.AddSign(new PSSign(-1, new List<int>(), -1, -1, "导入标识, 请勿删除."));
             for (int i = 0; i < Main.sign.Length; i++)
             {
@@ -24,14 +26,33 @@ namespace PowerfulSign
                     //TShock.Log.ConsoleInfo($"已导入第 {i + 1} 条.");
                 }
             }
-            TShock.Log.ConsoleInfo($"<PowerfulSign> 完成, 共导入 {PSPlugin.SignList.Count - 1} 条标牌数据.");
+            TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 完成, 共导入 {PSPlugin.SignList.Count - 1} 条标牌数据.");
         }
         public static PSSign GetSign(int x, int y) => PSPlugin.SignList.Where(s => s.X == x && s.Y == y).FirstOrDefault();
         public static bool TryGetSign(int x, int y, out PSSign sign)
         {
             sign = PSPlugin.SignList.FirstOrDefault(s => s.X == x && s.Y == y);
-            if (sign == null) return false; 
+            if (sign == null) return false;
             else return true;
+        }
+        public static bool TryGetSignByGuess(int x, int y, out PSSign sign)
+        {
+            sign = PSPlugin.SignList.FirstOrDefault(s => new Rectangle(s.X, s.Y, 2, 2).Contains(x, y));
+            if (sign == null) return false;
+            else return true;
+        }
+        #endregion
+        public static int FindChestByGuessing(int X, int Y)
+        {
+            for (int i = 0; i < 8000; i++)
+            {
+                if (Main.chest[i] != null && new Rectangle(Main.chest[i].x, Main.chest[i].y, 2, 2).Contains(X, Y))
+                {
+                    return i;
+                }
+            }
+
+            return -1;
         }
         public static bool TryGetAccountByID(int id, out UserAccount account)
         {
@@ -69,6 +90,8 @@ namespace PowerfulSign
                 return list;
             });
         }
+        public static void UpdateChest(int index, List<int> slots) => slots.ForEach(s => UpdateChest(index, s));
+        public static void UpdateChest(int index, int slot) => NetMessage.SendData(32, -1, -1, null, index, slot);
         public static bool IsPointInCircle(Point p, Circle circle) => IsPointInCircle(p.X, p.Y, circle.Center.X, circle.Center.Y, circle.R);
         public static bool IsPointInCircle(int x, int y, int cx, int cy, double r)
         {
@@ -103,23 +126,209 @@ namespace PowerfulSign
             public double R;//圆半径
         }
         #region 一些拓展函数
-        public static List<string>Split(this string text, string splitText) => text.Split(new[] { splitText }, StringSplitOptions.None).ToList();
+        public static List<string> Split(this string text, string splitText) => text.Split(new[] { splitText }, StringSplitOptions.None).ToList();
         public async static void SendSignDataInCircle(this TSPlayer plr, int radius)
         {
-            await Task.Run(() => {
-                plr.GetData<PSPlayer>("PSPlayer").LastSignIndex = -1;
-                PSPlugin.SignList.Where(s => IsPointInCircle(s.X, s.Y, plr.TileX, plr.TileY, radius)).ForEach(s => plr.SendSignData(s, false));
+            await Task.Run(() =>
+            {
+                var psp = plr.GetData<PSPlayer>("PSPlayer");
+                psp.LastSignIndex = -1;
+                PSPlugin.SignList.Where(s => IsPointInCircle(s.X, s.Y, plr.TileX, plr.TileY, radius) && s != psp.VisitingSign).ForEach(s => plr.SendSignData(s, false));
             });
         }
         public static void SendSignData(this TSPlayer plr, PSSign sign, bool open, int? index = null)
         {
             var psp = plr.GetData<PSPlayer>("PSPlayer");
-            if (index != null)
+            if (index == null)
             {
                 if (psp.LastSignIndex > 998) psp.LastSignIndex = -1;
                 psp.LastSignIndex++;
             }
+            if (open)
+            {
+                psp.VisitingSign = sign;
+                NetMessage.PlayNetSound(new NetMessage.NetSoundInfo(plr.TPlayer.position, 122, -1, 0.62f), plr.Index);
+            }
+
             plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)(index ?? psp.LastSignIndex)).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(((plr.Account ?? new UserAccount() { ID = -2 }).ID == sign.Owner || sign.Owner == -1) ? sign.Text : sign.PromptText).PackByte((byte)plr.Index).PackByte(new BitsByte(!open)).GetByteData());
+        }
+        public static void SendShopText(this TSPlayer plr, PSSign sign)
+        {
+            var text = $"[Customer]\n请勿修改所有已存在文本, 直接输入要购买/出售的数量.\n";
+            plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)0).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(text).PackByte((byte)plr.Index).PackByte(new BitsByte(false)).GetByteData());
+        }
+        public static int ItemNumInInventory(this TSPlayer plr, int type, int prefix)
+        {
+            int num = 0;
+            plr.TPlayer.inventory.ForEach(i => { if (i.type == type && (prefix == 0 ? true : i.prefix == prefix)) num += i.stack; });
+            return num;
+        }
+        public static void GiveItemEX(this TSPlayer plr, int type, int stack, int prefix)
+        {
+            var item = new Item();
+            item.SetDefaults(type);
+            int num = 0;
+            
+            while (num < stack)
+            {
+                int itemID;
+                if (stack - num > item.maxStack)
+                {
+                    itemID = Item.NewItem(plr.TPlayer.position, item.height, item.width, type, item.maxStack, false, prefix);
+                    num += item.maxStack;
+                }
+                else
+                {
+                    itemID = Item.NewItem(plr.TPlayer.position, item.height, item.width, type, stack - num, false, prefix);
+                    num = stack;
+                }
+                NetMessage.SendData(90, -1, -1, null, itemID, 0);
+            }
+        }
+        /// <summary>
+        /// 玩家背包是否能装下指定数量物品
+        /// </summary>
+        /// <param name="plr"></param>
+        /// <param name="item"></param>
+        /// <returns></returns>
+        public static bool IsInventoryAviliable(this TSPlayer plr, Item item, int stack)
+        {
+            int num = 0;
+            plr.TPlayer.inventory.ForEach(i =>
+            {
+                if (i != null && i.type != 0)
+                {
+                    if (i.type == item.type)
+                    {
+                        num += item.maxStack - i.stack;
+                    }
+                }
+                else num += item.maxStack;
+            });
+            if (stack <= num) return true;
+            return false;
+        }
+        /// <summary>
+        /// 是否成功从玩家背包删除指定数量物品
+        /// </summary>
+        /// <param name="plr"></param>
+        /// <param name="item"></param>
+        public static bool DelItemFromInventory(this TSPlayer plr, Item item, int stack) => plr.DelItemFromInventory(item.type, stack, item.prefix);
+        public static bool DelItemFromInventory(this TSPlayer plr, int type, int num, int prefix)
+        {
+            var tempnum = 0;
+            int slot = 0;
+            plr.TPlayer.inventory.ForEach(i =>
+            {
+                if (i != null && i.type == type && (prefix == 0 ? true : i.prefix == prefix))
+                {
+                    if (tempnum < num)
+                    {
+                        if (num - tempnum >= i.stack)
+                        {
+                            tempnum += i.stack;
+                            i.SetDefaults(0);
+                            plr.SendData(PacketTypes.PlayerSlot, null, plr.Index, slot); //移除玩家背包内的物品
+                        }
+                        else
+                        {
+                            i.stack -= num - tempnum;
+                            tempnum = num;
+                            plr.SendData(PacketTypes.PlayerSlot, null, plr.Index, slot); //移除玩家背包内的物品
+                        }
+                    }
+
+                }
+                slot++;
+            });
+            if (tempnum == num) return true;
+            return false;
+        }
+        public static bool TakeMoney(this TSPlayer plr, long num) => UnifiedEconomyFramework.UEF.MoneyDown(plr.Name, num);
+        public static bool GiveMoney(this TSPlayer plr, long num) => UnifiedEconomyFramework.UEF.MoneyUp(plr.Name, num);
+        public static long Balance(this TSPlayer plr) => UnifiedEconomyFramework.UEF.Balance(plr.Name);
+        public static void BuyItem(this TSPlayer plr, UserAccount owner, PSSign sign, Item item, int stack, int cost)
+        {
+            if (sign.ChestID != -1)
+            {
+                if (sign.Inventory >= stack)
+                {
+                    if (plr.Balance() >= cost)
+                    {
+                        if (plr.IsInventoryAviliable(item, stack))
+                        {
+                            if (plr.DelItemFromInventory(item, stack) && sign.DelItemFromChest(item, stack) && plr.TakeMoney(cost) && UEF.MoneyUp(owner.Name, cost))
+                            {
+                                plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功购买 {stack} 个 {item.Name}, 花费 {cost} {PSPlugin.Config.MoneyName}.");
+                                plr.GiveItemEX(item.type, stack, item.prefix);
+                            }
+                            else
+                            {
+                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
+                            }
+                        }
+                        else
+                        {
+                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 背包空间不足, 无法装下 {stack} 个 {item.Name}.");
+                        }
+                    }
+                    else
+                    {
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你的余额不足. 当前剩余 {plr.Balance()}.");
+                    }
+                }
+                else
+                {
+                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店库存不足, 无法购买. 当前剩余: {sign.Inventory}.");
+                }
+            }
+            else
+            {
+                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未发现此商店的附属储存空间.");
+            }
+        }
+        public static void SellItem(this TSPlayer plr, UserAccount owner, PSSign sign, Item item, int stack, int cost)
+        {
+            if (sign.ChestID != -1)
+            {
+                if (sign.AviliableSlot >= stack)
+                {
+                    if (UEF.Balance(owner.Name) >= cost)
+                    {
+                        if (plr.ItemNumInInventory(item.type, item.prefix) >= stack)
+                        {
+                            if (sign.AddItemToChest(item, stack) && plr.DelItemFromInventory(item, stack) && plr.GiveMoney(cost) && UEF.MoneyDown(owner.Name, cost))
+                            {
+                                plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功出售 {stack} 个 {item.Name}, 获得 {cost} {PSPlugin.Config.MoneyName}.");
+                            }
+                            else
+                            {
+                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
+                            }
+                        }
+                        else
+                        {
+                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未在你的背包中发现足够的 {item.Name}. 已找到 {plr.ItemNumInInventory(item.type, item.prefix)} 个.");
+                        }
+                    }
+                    else
+                    {
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 卖家余额不足以支付此次交易.");
+                    }
+                }
+                else
+                {
+                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店储存空间不足, 无法装下 {stack} 个 {item.Name}. 当前剩余空间 {sign.AviliableSlot}.");
+                }
+            }
+            else
+            {
+                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未发现此商店的附属储存空间.");
+            }
+        }
+        public static void SendCombatText(this TSPlayer plr, string text, Color color)
+        {
+            plr.SendData(PacketTypes.CreateCombatTextExtended, text, (int)color.PackedValue, plr.X, plr.Y);
         }
         public static void SendCombatText(this TSPlayer plr, string text, Color color, int tilex, int tiley)
         {

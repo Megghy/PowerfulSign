@@ -23,8 +23,8 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-   <LangVersion>latest</LangVersion>
-</PropertyGroup>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
@@ -69,6 +69,7 @@
     <Compile Include="PSPlayer.cs" />
     <Compile Include="PSPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="PSSign.cs" />
     <Compile Include="RawDataBuilder.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>

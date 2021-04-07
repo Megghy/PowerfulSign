@@ -33,28 +33,34 @@ namespace PowerfulSign
             try
             {
                 PSPlugin.Config = JsonConvert.DeserializeObject<Config>(File.ReadAllText(Path.Combine(TShock.SavePath, "PowerfulSign.json")));
-                TShock.Log.ConsoleInfo($"<PowerfulSign> 成功读取配置文件.");
+                TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 成功读取配置文件.");
             }
-            catch (Exception ex) { TShock.Log.Error(ex.Message); TShock.Log.ConsoleError("<PowerfulSign> 读取配置文件失败."); }
+            catch (Exception ex) { TShock.Log.Error(ex.Message); TShock.Log.ConsoleError("[C/66D093:<PowerfulSign>] 读取配置文件失败."); }
         }
+        [JsonProperty]
+        public string MoneyName = "$";
         [JsonProperty]
         public int RefreshRadius = 200;
         [JsonProperty]
         public bool AutoRefresh = true;
         [JsonProperty]
         public int AutoRefreshLevel = 30;
+        [JsonProperty]
+        public int CombatTextRange = 1;
+        [JsonProperty]
+        public int CombatTextSendLevel = 5;
         public class PromptTexts
         {
-            public string Normal = "这是 {owner} 的牌子.\n{text}";
-            public string Shop = "[商店]\n出售 {item.name}, 每个 {price} 经验.\n当前剩余 {item.stack} 个.";
+            public string Normal = "{text}";
+            public string Shop = "[商店]\n{type}\n{item.name}, 每组({item.stack}个) {price} {moneyname}.\n当前库存剩余 {inventory} 个.";
             public string Command = "这是一个命令标牌. 使用需要耗费 {cost} 经验.";
         }
         [JsonProperty]
         public PromptTexts DefaultPromptText = new PromptTexts();
         public class CombatTexts
         {
-            public string Normal = "这是 {owner} 的牌子.";
-            public string Shop = "[商店]\n出售 {item.name}, 每个 {price} 经验.\n当前剩余 {item.stack} 个.";
+            public string Normal = "{text}";
+            public string Shop = "[商店]\n{type}\n{item.name}, 每组({item.stack}个) {price} {moneyname}.\n当前库存剩余 {inventory} 个.";
             public string Command = "这是一个命令标牌. 使用需要耗费 {cost} 经验.";
         }
         [JsonProperty]

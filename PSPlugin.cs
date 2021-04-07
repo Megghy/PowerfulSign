@@ -4,6 +4,8 @@ using System.Linq;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
+using TShockAPI.DB;
+using TShockAPI.Hooks;
 
 namespace PowerfulSign
 {
@@ -37,7 +39,7 @@ namespace PowerfulSign
                 TShock.Players[g.Who].SetData<PSPlayer>("PSPlayer", new PSPlayer(TShock.Players[g.Who]));
             });
             GetDataHandlers.TileEdit += Net.OnTileEdit;
-            TShockAPI.Hooks.GeneralHooks.ReloadEvent += Config.Load;
+            GeneralHooks.ReloadEvent += (ReloadEventArgs r) => { Config.Load(); DB.GetAllSign(); };
             Commands.ChatCommands.Add(new Command("ps.use", OnCommand, new string[] { "ps", "标牌" }));
         }
         protected override void Dispose(bool disposing)
@@ -55,6 +57,11 @@ namespace PowerfulSign
                     case "1":
                         plr.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
                         break;
+                    case "check":
+                        int num = 0;
+                        SignList.ToList().Where(s => s.X >= 0 && s.X < Main.maxTilesX && s.Y >= 0 && s.Y < Main.maxTilesY && !Main.tileSign[Main.tile[s.X, s.Y].type]).ForEach(s => { SignList.Remove(s); num++; });
+                        plr.SendInfoMessage($"移除 {num} 个无效标牌数据.");
+                        break;
                 }
             }
             else
@@ -62,101 +69,5 @@ namespace PowerfulSign
 
             }
         }
-    }
-    public class PSSign
-    {
-        public PSSign(int owner, List<int> friends, int x, int y, string text, int id = -1, bool canedit = false)
-        {
-            ID = id;
-            Owner = owner;
-            Friends = friends;
-            X = x;
-            Y = y;
-            Text = text;
-            CanEdit = canedit;
-
-            ProcessText();
-        }
-        void ProcessText()
-        {
-            if (Text.StartsWith("[") && Text.EndsWith("]") && Text.Contains("\n"))
-            {
-                var lines = Text.Split("\n");
-                var origintype = lines[0].SearchString("[", "]").ToLower();
-                switch (origintype)
-                {
-                    case "shop":
-                        Type = Types.Shop;
-                        _CombatText = "看啥看";
-                        break;
-                    case "command":
-                        Type = Types.Command;
-
-                        break;
-                }
-            }
-            else Type = Types.Normal;
-        }
-        public enum Types
-        {
-            Normal,
-            Shop,
-            Command,
-        }
-        public Types Type { get; set; }
-        public void Update()
-        {
-            DB.UpdateSign(this);
-            SendToAll();
-        }
-        public void SendToAll()
-        {
-            var t = this;
-            TShock.Players.Where(p => p != null).ForEach(p => p.SendSignData(t, false, 0));
-        }
-        public int ID { get; set; }
-        public int Owner { get; set; }
-        public List<int> Friends { get; set; }
-        public int X { get; set; }
-        public int Y { get; set; }
-        public string Text { get; set; }
-        public bool CanEdit { get; set; }
-        public string _PromptText = string.Empty;
-        public string PromptText
-        {
-            get
-            {
-                return _PromptText == string.Empty ? Type switch
-                {
-                    Types.Normal => PSPlugin.Config.DefaultPromptText.Normal == "" ? Text : PSPlugin.Config.DefaultPromptText.Normal,
-                    Types.Shop => PSPlugin.Config.DefaultPromptText.Shop,
-                    Types.Command => PSPlugin.Config.DefaultPromptText.Command,
-                    _ => Text
-                } : _PromptText;
-            }
-        }
-        public string _CombatText = string.Empty;
-        public string CombatText { get {
-                return _CombatText == string.Empty ? Type switch
-                {
-                    Types.Normal => PSPlugin.Config.DefaultCombatText.Normal == "" ? Text : PSPlugin.Config.DefaultCombatText.Normal,
-                    Types.Shop => PSPlugin.Config.DefaultCombatText.Shop,
-                    Types.Command => PSPlugin.Config.DefaultCombatText.Command,
-                    _ => Text
-                } : _CombatText;
-            } }
-        public List<PSSign_Command> Commands { get; set; }
-    }
-    public struct PSSign_Command
-    {
-        public PSSign_Command(string command, int cooldown, int cost = 0)
-        {
-            Command = command;
-            CoolDown = cooldown;
-            Cost = cost;
-        }
-        public string Command { get; set; }
-        public int CoolDown { get; set; }
-        public int Cost { get; set; }
     }
 }
