@@ -2,7 +2,6 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using System.Timers;
 using Microsoft.Xna.Framework;
 using TShockAPI;
 using TShockAPI.DB;
@@ -13,11 +12,11 @@ namespace PowerfulSign
     {
         public PSPlayer(TSPlayer plr)
         {
-            TSP = plr;
+            Player = plr;
             Initialize();
         }
-        TSPlayer TSP { get; set; }
-        UserAccount Account { get { return TSP.Account ?? new UserAccount() { ID = -1 }; } }
+        TSPlayer Player { get; set; }
+        UserAccount Account { get { return Player.Account ?? new UserAccount() { ID = -2 }; } }
         public int LastSignIndex;
         public PSSign VisitingSign;
 
@@ -33,7 +32,6 @@ namespace PowerfulSign
         }
         public void Initialize()
         {
-            TSP.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
             LastSignIndex = -1;
             Loop();
         }
@@ -44,30 +42,31 @@ namespace PowerfulSign
                 int autorefreshCount = 0;
                 int errorCount = 0;
                 Dictionary<int, int> combatCount = new Dictionary<int, int>();
-                while (TSP.Active)
+                while (Player.Active)
                 {
                     try
                     {
-                        var position = TSP.TPlayer.position;
-                        var plrrect = new Rectangle((int)(position.X / 16 - PSPlugin.Config.CombatTextRange), (int)(position.Y / 16 - PSPlugin.Config.CombatTextRange), 2 + PSPlugin.Config.CombatTextRange * 2, 3 + PSPlugin.Config.CombatTextRange * 2);
-                        PSPlugin.SignList.Where(s => plrrect.Intersects(new Rectangle(s.X, s.Y, 2, 2))).ForEach(s =>
+                        var position = Player.TPlayer.position;
+                        var combatrect = new Rectangle((int)(position.X / 16 - PSPlugin.Config.CombatTextRange), (int)(position.Y / 16 - PSPlugin.Config.CombatTextRange), 2 + PSPlugin.Config.CombatTextRange * 2, 2 + PSPlugin.Config.CombatTextRange * 2);
+                        if (VisitingSign != null && !new Rectangle(VisitingSign.X, VisitingSign.Y, 2, 2).Intersects(new Rectangle((int)(position.X / 16 - 5), (int)(position.Y / 16 - 5), 2 + PSPlugin.Config.CombatTextRange * 12, 12))) VisitingSign = null; //超出范围则未在编辑标牌.
+                        PSPlugin.SignList.Where(s => combatrect.Intersects(new Rectangle(s.X, s.Y, 2, 2))).ForEach(s =>
                         {
                             if (!combatCount.ContainsKey(s.ID))
                             {
-                                TSP.SendCombatText(s.CombatText, Color.White, s.X, s.Y);
+                                Player.SendCombatText(s.CombatText, s.Color, s.X, s.Y);
                                 combatCount.Add(s.ID, 0);
                             }
                         });
                         if (autorefreshCount >= PSPlugin.Config.AutoRefreshLevel)
                         {
-                            TSP.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
+                            Player.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
                             autorefreshCount = 0;
                         }
                         else autorefreshCount++;
 
                         if (errorCount >= 4)
                         {
-                            PSPlugin.SignList.Where(s => s.Owner == Account.ID && s.Error).ForEach(s => TSP.SendCombatText($"[C/66D093:<PowerfulSign>]\n标牌无效", Color.Red, s.X, s.Y));
+                            PSPlugin.SignList.Where(s => s.Owner == Account.ID && s.Error).ForEach(s => Player.SendCombatText($"[C/66D093:<PowerfulSign>]\n标牌无效", Color.Red, s.X, s.Y));
                             errorCount = 0;
                         }
                         else autorefreshCount++;
@@ -83,7 +82,7 @@ namespace PowerfulSign
                             if (TradeTimer < 10) TradeTimer++;
                             else
                             {
-                                TSP.SendInfoMessage($"[C/66D093:<PowerfulSign>] 购买/出售请求已超时.");
+                                Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 购买/出售请求已超时.");
                                 _WannaTrade = null;
                                 TradeTimer = 0;
                             }
@@ -97,6 +96,43 @@ namespace PowerfulSign
                     }
                 }
             });
+        }
+        public void UseCommandSign(PSSign sign)
+        {
+            if (Player.ContainsData($"PSCommandCoolDown_{sign.ID}"))
+            {
+                var time = (DateTime.Now - Player.GetData<DateTime>($"PSCommandCoolDown_{sign.ID}")).TotalMilliseconds / 1000.0;
+                if (time > sign.Command.CoolDown)
+                {
+                    Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 尚未冷却. 剩余 {sign.Command.CoolDown - time:0.00} 秒.");
+                    return;
+                }
+                else
+                {
+                    Player.RemoveData($"PSCommandCoolDown_{sign.ID}");
+                }
+            }
+            else
+            {
+                Player.SetData($"PSCommandCoolDown_{sign.ID}", DateTime.Now);
+                return;
+            }
+            if (sign.Command.Cost != 0)
+            {
+                if (UnifiedEconomyFramework.UEF.Balance(Player.Name) < sign.Command.Cost)
+                {
+                    Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你的余额不足以支付此命令标牌使用费用.");
+                    return;
+                }
+                else UnifiedEconomyFramework.UEF.MoneyDown(Player.Name, sign.Command.Cost);
+            }
+            var group = Player.Group;
+            if (sign.Command.IgnorePermissions) Player.Group = new SuperAdminGroup();
+            sign.Command.Commands.ForEach(c =>
+            {
+                Commands.HandleCommand(Player, c.Replace("{name}", Player.Name));
+            });
+            Player.Group = group;
         }
     }
 }

@@ -20,7 +20,7 @@ namespace PowerfulSign
                 {
                     var plr = TShock.Players[args.Msg.whoAmI] ?? new TSPlayer(-1);
                     var psp = plr.GetData<PSPlayer>("PSPlayer");
-                    var userID = (plr.Account ?? new TShockAPI.DB.UserAccount() { ID = -1 }).ID;
+                    var userID = plr.AccountEX().ID;
                     switch (args.MsgID)
                     {
                         case PacketTypes.SignRead:
@@ -38,7 +38,7 @@ namespace PowerfulSign
                                         }
                                         else
                                         {
-                                            plr.SendSignData(sign, true, 0);
+                                            plr.SendSignDataVisiting(sign);
                                         }
                                         break;
                                     case PSSign.Types.Shop:
@@ -73,8 +73,12 @@ namespace PowerfulSign
                                         }
                                         else
                                         {
-                                            plr.SendSignData(sign, true, 0);
+                                            plr.SendSignDataVisiting(sign);
                                         }
+                                        break;
+                                    case PSSign.Types.Command:
+                                        if (sign.Owner != userID) psp.UseCommandSign(sign);
+                                        else plr.SendSignDataVisiting(sign);
                                         break;
                                 }
                             }
@@ -82,7 +86,7 @@ namespace PowerfulSign
                             {
                                 var tempSign = new PSSign(userID, new List<int>(), x, y, "");
                                 DB.AddSign(tempSign);
-                                plr.SendSignData(tempSign, true);
+                                plr.SendSignDataVisiting(sign);
                             }
                             break;
                         case PacketTypes.SignNew:
@@ -92,7 +96,7 @@ namespace PowerfulSign
                             y = reader.ReadInt16();
                             var text = reader.ReadString();
                             var owner = reader.ReadInt16();
-                            if (Utils.TryGetSign(x, y, out sign) && CheckShopText(text, plr, sign))
+                            if (Utils.TryGetSign(x, y, out sign) && !CheckShopText(text, plr, sign))
                             {
                                 psp.VisitingSign = null;
                                 if (sign.Text != text)
@@ -101,10 +105,16 @@ namespace PowerfulSign
                                     {
                                         sign.Text = text;
                                         sign.Update();
+                                        psp.VisitingSign = null;
+                                        plr.SendSignDataVisiting(sign); //编辑者要多发一次来关掉牌子
                                         if (sign.ProcessText())
                                         {
-                                            sign.Owner = plr.Account.ID;
+                                            sign.Owner = plr.AccountEX().ID;
                                             plr.SendSuccessMessage("[C/66D093:<PowerfulSign>] 已成功创建特殊标牌.");
+                                        }
+                                        else
+                                        {
+                                            plr.SendSuccessMessage("[C/66D093:<PowerfulSign>] 已更新标牌文本.");
                                         }
                                     }
                                     else
@@ -117,11 +127,11 @@ namespace PowerfulSign
 
                                 }
                             }
-                            else
+                            else if(sign == null)
                             {
                                 var tempSign = new PSSign(userID, new List<int>(), x, y, text);
                                 DB.AddSign(tempSign);
-                                plr.SendSignData(tempSign, true);
+                                plr.SendSignDataVisiting(sign);
                             }
                             break;
                         case PacketTypes.PlaceObject:
@@ -132,7 +142,7 @@ namespace PowerfulSign
                             {
                                 var tempSign = new PSSign(userID, new List<int>(), x, y, "");
                                 DB.AddSign(tempSign);
-                                plr.SendSignData(tempSign, true);
+                                plr.SendSignData(tempSign);
                             }
                             break;
                         case PacketTypes.ChestGetContents:
@@ -178,6 +188,13 @@ namespace PowerfulSign
                 }
             }
         }
+        /// <summary>
+        /// 表示是否为批量商店购买文本
+        /// </summary>
+        /// <param name="text"></param>
+        /// <param name="plr"></param>
+        /// <param name="sign"></param>
+        /// <returns>true为是, false为别的文本.</returns>
         public static bool CheckShopText(string text, TSPlayer plr, PSSign sign)
         {
             try
@@ -193,12 +210,12 @@ namespace PowerfulSign
                             if (!text.StartsWith("[Customer]\n请勿修改所有已存在文本, 直接输入要购买/出售的数量.\n"))
                             {
                                 plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 购买/出售格式无效, 请勿随意改动原有文本.");
-                                plr.SendSignData(sign, true, 0);
+                                plr.SendSignDataVisiting(sign);
                                 return true;
                             }
                             if (int.TryParse(lines[2], out int num) && num > 0)
                             {
-                                var owner = TShock.UserAccounts.GetUserAccountByID(sign.Owner) ?? new TShockAPI.DB.UserAccount();
+                                var owner = sign.Account;
                                 var cost = sign.Shop.Price * num;
                                 var item = sign.Shop.Item;
                                 var stack = sign.Shop.Stack * num;
@@ -228,11 +245,11 @@ namespace PowerfulSign
                     {
                         var plr = args.Player;
                         PSPlugin.SignList.ToList().Where(s => s.X >= 0 && s.X < Main.maxTilesX && s.Y >= 0 && s.Y < Main.maxTilesY && !Main.tileSign[Main.tile[s.X, s.Y].type]).ForEach(s => {
-                            if (s.Owner != (args.Player.Account ?? new TShockAPI.DB.UserAccount()).ID && !plr.HasPermission("ps.admin.destroy"))
+                            if (s.Owner != args.Player.AccountEX().ID && !plr.HasPermission("ps.admin.destroy"))
                             {
                                 plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你没有权限摧毁此标牌.");
-                                plr.SendSignData(s, false);
                                 WorldGen.SquareTileFrame(args.X, args.Y);
+                                plr.SendSignData(s);
                                 args.Handled = true;
                             }
                             else

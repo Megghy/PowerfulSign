@@ -132,31 +132,36 @@ namespace PowerfulSign
             await Task.Run(() =>
             {
                 var psp = plr.GetData<PSPlayer>("PSPlayer");
-                psp.LastSignIndex = -1;
-                PSPlugin.SignList.Where(s => IsPointInCircle(s.X, s.Y, plr.TileX, plr.TileY, radius) && s != psp.VisitingSign).ForEach(s => plr.SendSignData(s, false));
+                psp.LastSignIndex = psp.VisitingSign == null ? -1 : 0; //从第一个开始, 第零个一般是当前正在看的
+                PSPlugin.SignList.Where(s => IsPointInCircle(s.X, s.Y, plr.TileX, plr.TileY, radius) && psp.VisitingSign != s).ForEach(s => plr.SendSignData(s));
             });
         }
-        public static void SendSignData(this TSPlayer plr, PSSign sign, bool open, int? index = null)
+        public static void SendSignDataDirect(this TSPlayer plr, PSSign sign, bool open, int index)
         {
-            var psp = plr.GetData<PSPlayer>("PSPlayer");
-            if (index == null)
-            {
-                if (psp.LastSignIndex > 998) psp.LastSignIndex = -1;
-                psp.LastSignIndex++;
-            }
+            var psp = plr.PSP();
+            if (index == 0) psp.LastSignIndex = 0;
             if (open)
             {
                 psp.VisitingSign = sign;
                 NetMessage.PlayNetSound(new NetMessage.NetSoundInfo(plr.TPlayer.position, 122, -1, 0.62f), plr.Index);
             }
-
-            plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)(index ?? psp.LastSignIndex)).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(((plr.Account ?? new UserAccount() { ID = -2 }).ID == sign.Owner || sign.Owner == -1) ? sign.Text : sign.PromptText).PackByte((byte)plr.Index).PackByte(new BitsByte(!open)).GetByteData());
+            plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)index).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(open ? sign.Text : sign.PromptText).PackByte((byte)plr.Index).PackByte(new BitsByte(!open)).GetByteData());
         }
+        public static void SendSignData(this TSPlayer plr, PSSign sign)
+        {
+            var psp = plr.PSP();
+            if (psp.LastSignIndex > 998) psp.LastSignIndex = -1;
+            psp.LastSignIndex++;
+            plr.SendSignDataDirect(sign, sign == psp.VisitingSign, psp.LastSignIndex);
+        }
+        public static void SendSignDataVisiting(this TSPlayer plr, PSSign sign) => plr.SendSignDataDirect(sign, true, 0);
         public static void SendShopText(this TSPlayer plr, PSSign sign)
         {
             var text = $"[Customer]\n请勿修改所有已存在文本, 直接输入要购买/出售的数量.\n";
             plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)0).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(text).PackByte((byte)plr.Index).PackByte(new BitsByte(false)).GetByteData());
         }
+        public static UserAccount AccountEX(this TSPlayer plr) => plr.Account ?? new UserAccount() { ID = -2 };
+        public static PSPlayer PSP(this TSPlayer plr) => plr.GetData<PSPlayer>("PSPlayer");
         public static int ItemNumInInventory(this TSPlayer plr, int type, int prefix)
         {
             int num = 0;
@@ -168,7 +173,7 @@ namespace PowerfulSign
             var item = new Item();
             item.SetDefaults(type);
             int num = 0;
-            
+
             while (num < stack)
             {
                 int itemID;

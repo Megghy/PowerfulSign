@@ -52,16 +52,16 @@ namespace PowerfulSign
         public class PromptTexts
         {
             public string Normal = "{text}";
-            public string Shop = "[商店]\n{type}\n{item.name}, 每组({item.stack}个) {price} {moneyname}.\n当前库存剩余 {inventory} 个.";
-            public string Command = "这是一个命令标牌. 使用需要耗费 {cost} 经验.";
+            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.\n当前库存剩余 {shop.inventory} 个.";
+            public string Command = "这是一个命令标牌,包含 {command.count} 条命令,冷却时间 {command.cooldown} s, 使用需要耗费 {command.cost} {moneyname}.";
         }
         [JsonProperty]
         public PromptTexts DefaultPromptText = new PromptTexts();
         public class CombatTexts
         {
             public string Normal = "{text}";
-            public string Shop = "[商店]\n{type}\n{item.name}, 每组({item.stack}个) {price} {moneyname}.\n当前库存剩余 {inventory} 个.";
-            public string Command = "这是一个命令标牌. 使用需要耗费 {cost} 经验.";
+            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.";
+            public string Command = "这是一个命令标牌,包含 {command.count} 条命令,冷却时间 {command.cooldown} s, 使用需要耗费 {command.cost} {moneyname}.";
         }
         [JsonProperty]
         public CombatTexts DefaultCombatText = new CombatTexts();

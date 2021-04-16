@@ -1,8 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Microsoft.Xna.Framework;
 using Terraria;
 using TShockAPI;
 using TShockAPI.DB;
@@ -20,6 +19,7 @@ namespace PowerfulSign
             Y = y;
             Text = text;
             CanEdit = canedit;
+            Color = Color.White;
 
             ProcessText();
         }
@@ -27,163 +27,280 @@ namespace PowerfulSign
         {
             try
             {
+                _PromptText = null;
+                _CombatText = null;
                 if (Text.Contains("\n"))
                 {
                     var lines = Text.Split("\n");
                     if (lines[0].StartsWith("[") && lines[0].EndsWith("]"))
                     {
                         var maintype = lines[0].SearchString("[", "]").ToLower();
-                        var owner = TShock.Players.FirstOrDefault(p => p != null && p.Account != null && p.Account.ID == Owner) ?? new TSPlayer(-1);
+                        var owner = TShock.Players.FirstOrDefault(p => p != null && p.AccountEX().ID == Owner) ?? new TSPlayer(-1) { Account = this.Account ?? new UserAccount(), Group = TShock.Groups.GetGroupByName(Account.Group) };
                         switch (maintype)
                         {
                             case "shop":
-                                Type = Types.Shop;
-                                if (lines.Count >= 3)
+                                if (owner.HasPermission("ps.use.shop"))
                                 {
-                                    if (lines[1].ToLower() == "sell" || lines[1].ToLower() == "buy")
+                                    if (lines.Count >= 2)
                                     {
-                                        var tempshop = new PSSign_Shop();
-                                        for (int i = 2; i < lines.Count; i++)
+                                        if (lines[1].ToLower() == "sell" || lines[1].ToLower() == "buy")
                                         {
-                                            if (lines[i].Contains(":"))
+                                            var tempShop = new PSSign_Shop();
+                                            for (int i = 2; i < lines.Count; i++)
                                             {
-                                                var key = lines[i].ToLower().Split(':')[0];
+                                                if (lines[i].Contains(":"))
+                                                {
+                                                    var key = lines[i].Split(':')[0];
+                                                    var value = lines[i].Replace(key + ":", "");
+                                                    key = key.ToLower();
+                                                    switch (key)
+                                                    {
+                                                        case "item":
+                                                            if (value.Contains(" "))
+                                                            {
+                                                                var temp_item = value.Split(' ');
+                                                                if (temp_item.Count() >= 2)
+                                                                {
+                                                                    if (int.TryParse(temp_item[0], out int itemtype) && int.TryParse(temp_item[1], out int num) && int.TryParse(temp_item.Count() >= 3 ? temp_item[1] : "0", out int prefix))
+                                                                    {
+                                                                        tempShop.ItemType = itemtype;
+                                                                        var tempitem = new Item();
+                                                                        tempitem.SetDefaults(itemtype);
+                                                                        if (tempitem.type == 0)
+                                                                        {
+                                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的物品id.");
+                                                                            Error = true;
+                                                                            return false;
+                                                                        }
+                                                                        else if (num < 1)
+                                                                        {
+                                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 每次购买数量应大于零.");
+                                                                            Error = true;
+                                                                            return false;
+                                                                        }
+                                                                        else if (prefix != 0 && !tempitem.Prefix(prefix))
+                                                                        {
+                                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 物品前缀无效. 若无需设定物品前缀可只设定物品id及堆叠.");
+                                                                            Error = true;
+                                                                            return false;
+                                                                        }
+                                                                        tempitem.stack = num;
+                                                                        tempitem.prefix = (byte)prefix;
+                                                                        tempShop.Item = tempitem;
+                                                                        tempShop.Stack = num;
+                                                                    }
+                                                                    else
+                                                                    {
+                                                                        owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] item列格式错误. 应为 [c/6CCCA8:item:物品id 每次购买数量]");
+                                                                        Error = true;
+                                                                        return false;
+                                                                    }
+                                                                }
+
+                                                            }
+                                                            break;
+                                                        case "canbuyset":
+                                                            tempShop.CanBuySet = value.ToLower() == "true";
+                                                            break;
+                                                        case "unlimit":
+                                                            if (owner.HasPermission("ps.admin.unlimit"))
+                                                            {
+                                                                tempShop.UnLimit = value.ToLower() == "true";
+                                                            }
+                                                            else
+                                                            {
+                                                                owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限设定无限商店 <ps.admin.unlimit>, 此设置项将不会生效.");
+                                                            }
+                                                            break;
+                                                        case "price":
+                                                            if (int.TryParse(value, out int price))
+                                                            {
+                                                                tempShop.Price = price;
+                                                            }
+                                                            break;
+                                                        case "combat":
+                                                            if (owner.HasPermission("ps.use.combat"))
+                                                            {
+                                                                _CombatText = value;
+                                                            }
+                                                            else
+                                                            {
+                                                                owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义CombatText <ps.use.prompt>, 此设置项将不会生效.");
+                                                            }
+                                                            break;
+                                                        case "prompt":
+                                                            if (owner.HasPermission("ps.use.prompt"))
+                                                            {
+                                                                _PromptText = value;
+                                                            }
+                                                            else
+                                                            {
+                                                                owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义PromptText <ps.use.prompt>, 此设置项将不会生效.");
+                                                            }
+                                                            break;
+                                                        case "color":
+                                                            var color = System.Drawing.ColorTranslator.FromHtml("#FF0000");
+                                                            if (System.Drawing.Color.Empty != color)
+                                                            {
+                                                                Color = new Color(color.R, color.G, color.B);
+                                                            }
+                                                            else
+                                                            {
+                                                                owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的Hex颜色格式. 请搜索十六进制颜色.");
+                                                                Error = true;
+                                                                return false;
+                                                            }
+                                                            break;
+                                                    }
+                                                }
+                                                else
+                                                {
+                                                    return false;
+                                                }
+                                            }
+                                            if (tempShop.ItemType == 0)
+                                            {
+                                                owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 缺少必要条件: 物品id.");
+                                                Error = true;
+                                                return false;
+                                            }
+                                            else if (tempShop.Stack == 0)
+                                            {
+                                                owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 缺少必要条件: 物品数量.");
+                                                Error = true;
+                                                return false;
+                                            }
+                                            if (Utils.FindChestByGuessing(X + 2, Y) == -1)
+                                            {
+                                                owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未能在标牌右侧找到箱子.");
+                                                Error = true;
+                                                return false;
+                                            }
+                                            tempShop.Type = lines[1].ToLower() == "sell" ? PSSign_Shop.SELL : PSSign_Shop.BUY;
+                                            Shop = tempShop;
+                                            Type = Types.Shop;
+                                            Error = false;
+                                            return true;
+                                        }
+                                        else
+                                        {
+                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 第二排应为 sell 或 buy.");
+                                            Error = true;
+                                        }
+                                    }
+                                    else
+                                    {
+                                        owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 第二排应为 sell 或 buy.");
+                                        Error = true;
+                                    }
+                                }
+                                else
+                                {
+                                    owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限创建标牌商店 <ps.use.shop>.");
+                                    return false;
+                                }
+                                break;
+                            case "command":
+                                if (lines.Count >= 2)
+                                {
+                                    if (owner.HasPermission("ps.admin.command"))
+                                    {
+                                        Type = Types.Command;
+                                        var tempCommand = new PSSign_Command(new List<string>(), 1000, 0);
+                                        for (int i = 1; i < lines.Count; i++)
+                                        {
+                                            if (lines[i].StartsWith(TShock.Config.Settings.CommandSpecifier))
+                                            {
+                                                tempCommand.Commands.Add(lines[i].Remove(0, 1));
+                                            }
+                                            else if (lines[i].Contains(":"))
+                                            {
+                                                var key = lines[i].Split(':')[0];
                                                 var value = lines[i].Replace(key + ":", "");
+                                                key = key.ToLower();
                                                 switch (key)
                                                 {
-                                                    case "item":
-                                                        if (value.Contains(" "))
+                                                    case "cooldown":
+                                                        if (long.TryParse(value, out long cooldown))
                                                         {
-                                                            var temp_item = value.Split(' ');
-                                                            if (temp_item.Count() >= 2)
-                                                            {
-                                                                if (int.TryParse(temp_item[0], out int itemtype) && int.TryParse(temp_item[1], out int num) && int.TryParse(temp_item.Count() >= 3 ? temp_item[1] : "0", out int prefix))
-                                                                {
-                                                                    tempshop.ItemType = itemtype;
-                                                                    var tempitem = new Item();
-                                                                    tempitem.SetDefaults(itemtype);
-                                                                    if (tempitem.type == 0)
-                                                                    {
-                                                                        owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的物品id.");
-                                                                        Error = true;
-                                                                        return false;
-                                                                    }
-                                                                    else if (num < 1)
-                                                                    {
-                                                                        owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 每次购买数量应大于零.");
-                                                                        Error = true;
-                                                                        return false;
-                                                                    }
-                                                                    else if (prefix != 0 && !tempitem.Prefix(prefix))
-                                                                    {
-                                                                        owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 物品前缀无效. 若无需设定物品前缀可只设定物品id及堆叠.");
-                                                                        Error = true;
-                                                                        return false;
-                                                                    }
-                                                                    tempitem.stack = num;
-                                                                    tempitem.prefix = (byte)prefix;
-                                                                    tempshop.Item = tempitem;
-                                                                    tempshop.Stack = num;
-                                                                }
-                                                                else
-                                                                {
-                                                                    owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] item列格式错误. 应为 [c/6CCCA8:item:物品id 每次购买数量]");
-                                                                    Error = true;
-                                                                    return false;
-                                                                }
-                                                            }
-                                                            
-                                                        }
-                                                        break;
-                                                    case "canbuyset":
-                                                        tempshop.CanBuySet = value.ToLower() == "true";
-                                                        break;
-                                                    case "unlimit":
-                                                        if (owner.HasPermission("ps.admin.unlimit"))
-                                                        {
-                                                            tempshop.UnLimit = value.ToLower() == "true";
+                                                            tempCommand.CoolDown = cooldown;
                                                         }
                                                         else
                                                         {
-                                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限设定无限商店, 此设置项将不会生效.");
+                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 冷却时间格式错误, 应为毫秒 (1秒 = 1000毫秒).");
+                                                            Error = true;
+                                                            return false;
                                                         }
                                                         break;
-                                                    case "price":
-                                                        if (int.TryParse(value, out int price))
+                                                    case "cost":
+                                                        if (int.TryParse(value, out int cost))
                                                         {
-                                                            tempshop.Price = price;
-                                                        }
-                                                        break;
-                                                    case "combat":
-                                                        if (owner.HasPermission("ps.use.combat"))
-                                                        {
-                                                            _CombatText = value;
+                                                            tempCommand.Cost = cost;
                                                         }
                                                         else
                                                         {
-                                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义CombatText, 此设置项将不会生效.");
+                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 消耗货币数量格式错误.");
+                                                            Error = true;
+                                                            return false;
                                                         }
                                                         break;
-                                                    case "prompt":
-                                                        if (owner.HasPermission("ps.use.prompt"))
+                                                    case "color":
+                                                        var color = System.Drawing.ColorTranslator.FromHtml("#FF0000");
+                                                        if (System.Drawing.Color.Empty != color)
                                                         {
-                                                            _PromptText = value;
+                                                            Color = new Color(color.R, color.G, color.B);
                                                         }
                                                         else
                                                         {
-                                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义PromptText, 此设置项将不会生效.");
+                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的Hex颜色格式. 请搜索十六进制颜色.");
+                                                            Error = true;
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case "type":
+                                                        if (value.ToLower() == "close") {
+                                                            tempCommand.Type = PSSign_Command.CLOST;
+                                                        }
+                                                        else if (value.ToLower() == "click")
+                                                        {
+                                                            tempCommand.Type = PSSign_Command.CLICK;
+                                                        }
+                                                        else
+                                                        {
+                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign> 无效的标牌类型. 应为 click 或 close, 默认为click.");
+                                                            Error = true;
+                                                            return false;
+                                                        }
+                                                        break;
+                                                    case "ignoreperms":
+                                                    case "ignorepermission":
+                                                        if (value.ToLower() == "true")
+                                                        {
+                                                            tempCommand.IgnorePermissions = true;
                                                         }
                                                         break;
                                                 }
                                             }
-                                            else
-                                            {
-                                                return false;
-                                            }
+                                            Command = tempCommand;
+                                            Error = false;
+                                            return true;
                                         }
-                                        if (tempshop.ItemType == 0)
-                                        {
-                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 缺少必要条件: 物品id.");
-                                            Error = true;
-                                            return false;
-                                        }
-                                        else if (tempshop.Stack == 0)
-                                        {
-                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 缺少必要条件: 物品数量.");
-                                            Error = true;
-                                            return false;
-                                        }
-                                        if (Utils.FindChestByGuessing(X + 2, Y) == -1)
-                                        {
-                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未能在标牌右侧找到箱子.");
-                                            Error = true;
-                                            return false;
-                                        }
-                                        tempshop.Type = lines[1].ToLower() == "sell" ? PSSign_Shop.SELL : PSSign_Shop.BUY;
-                                        Shop = tempshop;
-                                        Type = Types.Shop;
-                                        Error = false;
-                                        return true;
                                     }
                                     else
                                     {
-                                        if (owner != null) owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 无效的商店格式. 第二排应为 sell 或 buy.");
-                                        Error = true;
+                                        owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限设定命令标牌 <ps.admin.command>.");
+                                        return false; 
                                     }
                                 }
                                 break;
-                            case "command":
-                                Type = Types.Command;
-
-                                break;
                         }
                     }
+                    else Type = Types.Normal;
+                    SendToAll();
                 }
-                else Type = Types.Normal;
-                SendToAll();
                 return false;
             }
-            catch { return false; }
+            catch (Exception ex) { TShock.Log.ConsoleError(ex.Message); return false; }
         }
         public enum Types
         {
@@ -200,72 +317,89 @@ namespace PowerfulSign
         public void SendToAll()
         {
             var t = this;
-            TShock.Players.Where(p => p != null).ForEach(p => p.SendSignData(t, false, 0));
+            TShock.Players.Where(p => p != null).ForEach(p => p.SendSignDataDirect(t, false, 0));
         }
         public bool Error = false;
-        public UserAccount Account => TShock.UserAccounts.GetUserAccountByID(Owner) ?? new UserAccount() { ID = -1, Name = "UnKnown" };
+        public UserAccount Account => TShock.UserAccounts.GetUserAccountByID(Owner) ?? new UserAccount() { ID = -2, Name = "UnKnown" };
         public int ID { get; set; }
         public int Owner { get; set; }
         public List<int> Friends { get; set; }
         public int X { get; set; }
         public int Y { get; set; }
+        public Color Color { get; set; }
         public string Text { get; set; }
         public bool CanEdit { get; set; }
-        public string _PromptText = string.Empty;
+        public string _PromptText;
         public string PromptText
         {
             get
             {
-                return _PromptText == string.Empty ? Type switch
+                return Type switch
                 {
-                    Types.Normal => PSPlugin.Config.DefaultPromptText.Normal
+                    Types.Normal => (_PromptText ?? PSPlugin.Config.DefaultPromptText.Normal)
+                    .Replace("\\n", "\n")
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
                     .Replace("{text}", Text)
                     .Replace("{owner}", Account.Name)
                     ,
 
-                    Types.Shop => PSPlugin.Config.DefaultPromptText.Shop
+                    Types.Shop => (_PromptText ?? PSPlugin.Config.DefaultPromptText.Shop)
+                    .Replace("\\n", "\n")
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
+                    .Replace("{text}", Text)
                     .Replace("{type}", Shop.Type == PSSign_Shop.SELL ? "出售" : "收购")
-                    .Replace("{item.name}", Shop.Item.Name)
-                    .Replace("{item.stack}", Shop.Stack.ToString())
-                    .Replace("{inventory}", Inventory.ToString())
-                    .Replace("{price}", Shop.Price.ToString())
-                    .Replace("{text}", Text)
-                    .Replace("{owner}", Account.Name)
+                    .Replace("{shop.name}", Shop.Item.Name)
+                    .Replace("{shop.stack}", Shop.Stack.ToString())
+                    .Replace("{shop.inventory}", Inventory.ToString())
+                    .Replace("{shop.price}", Shop.Price.ToString())
+                    .Replace("{shop.text}", Text)
+                    .Replace("{shop.owner}", Account.Name)
                     ,
 
-                    Types.Command => PSPlugin.Config.DefaultPromptText.Command,
+                    Types.Command => (_PromptText ?? PSPlugin.Config.DefaultPromptText.Command)
+                    .Replace("\\n", "\n")
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
+                    .Replace("{text}", Text)
+                    .Replace("{command.cost}", Command.Cost.ToString())
+                    .Replace("{command.cooldown}", Command.CoolDown.ToString())
+                    .Replace("{command.count}", Command.Commands.Count.ToString())
+                    ,
                     _ => Text
-                } : _PromptText;
+                };
             }
         }
-        public string _CombatText = string.Empty;
+        public string _CombatText;
         public string CombatText
         {
             get
             {
-                return _CombatText == string.Empty ? Type switch
+                return Type switch
                 {
-                    Types.Normal => PSPlugin.Config.DefaultCombatText.Normal == "" ? Text : PSPlugin.Config.DefaultCombatText.Normal
+                    Types.Normal => (_CombatText ?? PSPlugin.Config.DefaultCombatText.Normal)
+                    .Replace("\\n", "\n")
                     .Replace("{text}", Text)
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
                     .Replace("{owner}", Account.Name)
                     ,
 
-                    Types.Shop => PSPlugin.Config.DefaultCombatText.Shop
+                    Types.Shop => (_CombatText ?? PSPlugin.Config.DefaultCombatText.Shop)
                     .Replace("{type}", Shop.Type == PSSign_Shop.SELL ? "出售" : "收购")
-                    .Replace("{item.name}", Shop.Item.Name)
-                    .Replace("{item.stack}", Shop.Stack.ToString())
-                    .Replace("{inventory}", Inventory.ToString())
-                    .Replace("{price}", Shop.Price.ToString())
-                    .Replace("{text}", Text)
-                    .Replace("{owner}", Account.Name)
+                    .Replace("\\n", "\n")
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
+                    .Replace("{shop.name}", Shop.Item.Name)
+                    .Replace("{shop.stack}", Shop.Stack.ToString())
+                    .Replace("{shop.inventory}", Inventory.ToString())
+                    .Replace("{shop.price}", Shop.Price.ToString())
+                    .Replace("{shop.text}", Text)
+                    .Replace("{shop.owner}", Account.Name)
                     ,
 
-                    Types.Command => PSPlugin.Config.DefaultCombatText.Command,
+                    Types.Command => (_CombatText ?? PSPlugin.Config.DefaultCombatText.Command),
                     _ => Text
-                } : _CombatText;
+                };
             }
         }
-        public List<PSSign_Command> Commands { get; set; }
+        public PSSign_Command Command { get; set; }
         public PSSign_Shop Shop { get; set; }
         #region 箱子商店部分功能
         public int ChestID { get { return Utils.FindChestByGuessing(X + 2, Y); } }
@@ -278,7 +412,8 @@ namespace PowerfulSign
                 {
                     var chest = Main.chest[ChestID];
                     var num = 0;
-                    chest.item.ForEach(i => {
+                    chest.item.ForEach(i =>
+                    {
                         if (i.type == Shop.Item.type && (Shop.Prefix == 0 ? true : i.prefix == Shop.Prefix))
                         {
                             num += i.stack;
@@ -297,7 +432,8 @@ namespace PowerfulSign
                 {
                     var chest = Main.chest[ChestID];
                     var num = 0;
-                    chest.item.ForEach(i => {
+                    chest.item.ForEach(i =>
+                    {
                         if (i != null && i.type != 0)
                         {
                             if (i.type == Shop.ItemType)
@@ -437,7 +573,7 @@ namespace PowerfulSign
         public const int SELL = 0;
         public const int BUY = 1;
         public int Type { get; set; }
-        public Item Item{ get;set; }
+        public Item Item { get; set; }
         public int ItemType { get; set; }
         public int Stack { get; set; }
         public int Prefix { get; set; }
@@ -447,14 +583,20 @@ namespace PowerfulSign
     }
     public struct PSSign_Command
     {
-        public PSSign_Command(string command, int cooldown, int cost = 0)
+        public PSSign_Command(List<string> commands, long cooldown, int cost = 0)
         {
-            Command = command;
+            Type = 0;
+            Commands = commands;
             CoolDown = cooldown;
             Cost = cost;
+            IgnorePermissions = false;
         }
-        public string Command { get; set; }
-        public int CoolDown { get; set; }
+        public const int CLICK = 0;
+        public const int CLOST = 1;
+        public int Type { get; set; }
+        public bool IgnorePermissions { get; set; }
+        public List<string> Commands { get; set; }
+        public long CoolDown { get; set; }
         public int Cost { get; set; }
     }
 }

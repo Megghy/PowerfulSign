@@ -30,14 +30,14 @@ namespace PowerfulSign
         }
         public void OnPostInitialize(EventArgs args)
         {
-            Main.sign = new Sign[1000];
             DB.TryCreateTable();
             ServerApi.Hooks.NetGetData.Register(this, Net.OnGetData);
             //ServerApi.Hooks.NetSendData.Register(this, Net.OnSendData);
             ServerApi.Hooks.NetGreetPlayer.Register(this, (GreetPlayerEventArgs g) =>
             {
-                TShock.Players[g.Who].SetData<PSPlayer>("PSPlayer", new PSPlayer(TShock.Players[g.Who]));
+                if(!TShock.Players[g.Who].ContainsData("PSPlayer")) TShock.Players[g.Who].SetData<PSPlayer>("PSPlayer", new PSPlayer(TShock.Players[g.Who]));
             });
+            ServerApi.Hooks.ServerLeave.Register(this, (LeaveEventArgs l) => TShock.Players[l.Who].RemoveData("PSPlayer"));
             GetDataHandlers.TileEdit += Net.OnTileEdit;
             GeneralHooks.ReloadEvent += (ReloadEventArgs r) => { Config.Load(); DB.GetAllSign(); };
             Commands.ChatCommands.Add(new Command("ps.use", OnCommand, new string[] { "ps", "标牌" }));

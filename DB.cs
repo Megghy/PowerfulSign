@@ -41,14 +41,15 @@ namespace PowerfulSign
                     IQueryBuilder queryBuilder = new SqliteQueryCreator();
                     queryBuilder2 = queryBuilder;
                 }
-                if (new SqlTableCreator(db, queryBuilder2).EnsureTableStructure(sqlTable)) Utils.ImportSign(); //导入本地已有标牌
-                else CheckSignImport(); //读取所有标牌或新地图导入
+                new SqlTableCreator(db, queryBuilder2).EnsureTableStructure(sqlTable);
+                CheckSignImport();
             }
             catch (Exception ex) { TShock.Log.Error(ex.Message); }
+            //Main.sign = new Sign[1000];
         }
         public static bool CheckSignImport()
         {
-            if (RunSQL($"SELECT * FROM PowerfulSign WHERE WorldID='{Main.worldID}'", new object[] {  }).Read())
+            if (RunSQL($"SELECT * FROM PowerfulSign WHERE WorldID='{Main.worldID}'").Read())
             {
                 GetAllSign();
                 return true;
@@ -84,7 +85,7 @@ namespace PowerfulSign
             TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 载入 {PSPlugin.SignList.Count} 条标牌数据.");
             return list;
         }
-        public static long AddSign(PSSign sign)
+        public static int AddSign(PSSign sign)
         {
             try
             {
