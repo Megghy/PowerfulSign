@@ -66,7 +66,7 @@ namespace PowerfulSign
         }
         public static List<PSSign> GetAllSign()
         {
-            TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 正在读入标牌数据...");
+            TShock.Log.ConsoleInfo($"<PowerfulSign> 正在读入标牌数据...");
             var reader = RunSQL($"SELECT * FROM PowerfulSign WHERE WorldID='{Main.worldID}';");
             var list = new List<PSSign>();
             while (reader.Read())
@@ -82,7 +82,7 @@ namespace PowerfulSign
                 catch (Exception ex) { TShock.Log.ConsoleError(ex.Message); }
             }
             PSPlugin.SignList = list;
-            TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 载入 {PSPlugin.SignList.Count} 条标牌数据.");
+            TShock.Log.ConsoleInfo($"<PowerfulSign> 载入 {PSPlugin.SignList.Count} 条标牌数据.");
             return list;
         }
         public static int AddSign(PSSign sign)

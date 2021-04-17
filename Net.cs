@@ -77,7 +77,11 @@ namespace PowerfulSign
                                         }
                                         break;
                                     case PSSign.Types.Command:
-                                        if (sign.Owner != userID) psp.UseCommandSign(sign);
+                                        if (sign.Owner != userID)
+                                        {
+                                            if(sign.Command.Type == 0 || sign.Command.Type == 2) psp.UseCommandSign(sign);
+                                            else plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你没有编辑此标牌的权限.");
+                                        }
                                         else plr.SendSignDataVisiting(sign);
                                         break;
                                 }
@@ -86,7 +90,7 @@ namespace PowerfulSign
                             {
                                 var tempSign = new PSSign(userID, new List<int>(), x, y, "");
                                 DB.AddSign(tempSign);
-                                plr.SendSignDataVisiting(sign);
+                                plr.SendSignDataVisiting(tempSign);
                             }
                             break;
                         case PacketTypes.SignNew:
@@ -99,6 +103,7 @@ namespace PowerfulSign
                             if (Utils.TryGetSign(x, y, out sign) && !CheckShopText(text, plr, sign))
                             {
                                 psp.VisitingSign = null;
+                                if (sign.Owner == -1) sign.Owner = userID;
                                 if (sign.Text != text)
                                 {
                                     if (sign.Owner == userID || sign.Owner == -1 || sign.Friends.Contains(userID) || plr.HasPermission("ps.use.edit"))
@@ -150,7 +155,7 @@ namespace PowerfulSign
                             y = reader.ReadInt16();
                             if (Utils.TryGetSign(x - 2, y, out sign))
                             {
-                                if (sign.Owner != userID && !plr.HasPermission("ps.admin.open"))
+                                if (sign.Owner != userID && sign.Type == PSSign.Types.Shop && !plr.HasPermission("ps.admin.open"))
                                 {
                                     plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 此箱子已被作为标牌商店容器, 无法打开.");
                                     args.Handled = true;
@@ -166,7 +171,7 @@ namespace PowerfulSign
                             {
                                 if (status == 1)
                                 {
-                                    if (sign.Owner != userID && !plr.HasPermission("ps.admin.destroy"))
+                                    if (sign.Owner != userID && sign.Type == PSSign.Types.Shop && !plr.HasPermission("ps.admin.destroy"))
                                     {
                                         plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 此箱子已被作为标牌商店容器, 无法摧毁.");
                                         WorldGen.SquareTileFrame(x, y);
@@ -244,7 +249,8 @@ namespace PowerfulSign
                     await Task.Run(() =>
                     {
                         var plr = args.Player;
-                        PSPlugin.SignList.ToList().Where(s => s.X >= 0 && s.X < Main.maxTilesX && s.Y >= 0 && s.Y < Main.maxTilesY && !Main.tileSign[Main.tile[s.X, s.Y].type]).ForEach(s => {
+                        while (Utils.TryGetSignByGuess(args.X, args.Y, out var s))
+                        {
                             if (s.Owner != args.Player.AccountEX().ID && !plr.HasPermission("ps.admin.destroy"))
                             {
                                 plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你没有权限摧毁此标牌.");
@@ -257,7 +263,7 @@ namespace PowerfulSign
                                 PSPlugin.SignList.Remove(s);
                                 Utils.DropItem(args.X, args.Y, Utils.GetItemFromTile(args.X, args.Y, Main.tile[args.X, args.Y]).Result[0]);
                             }
-                        });
+                        }
                     });
                 }
             }

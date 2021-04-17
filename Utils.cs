@@ -15,7 +15,7 @@ namespace PowerfulSign
         #region PSSign辅助工具
         public static void ImportSign()
         {
-            TShock.Log.ConsoleInfo("[C/66D093:<PowerfulSign>] 首次进入地图, 正在导入本地标牌数据...");
+            TShock.Log.ConsoleInfo("<PowerfulSign> 首次进入地图, 正在导入本地标牌数据...");
             DB.AddSign(new PSSign(-1, new List<int>(), -1, -1, "导入标识, 请勿删除."));
             for (int i = 0; i < Main.sign.Length; i++)
             {
@@ -26,7 +26,7 @@ namespace PowerfulSign
                     //TShock.Log.ConsoleInfo($"已导入第 {i + 1} 条.");
                 }
             }
-            TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 完成, 共导入 {PSPlugin.SignList.Count - 1} 条标牌数据.");
+            TShock.Log.ConsoleInfo($"<PowerfulSign> 完成, 共导入 {PSPlugin.SignList.Count - 1} 条标牌数据.");
         }
         public static PSSign GetSign(int x, int y) => PSPlugin.SignList.Where(s => s.X == x && s.Y == y).FirstOrDefault();
         public static bool TryGetSign(int x, int y, out PSSign sign)
@@ -138,14 +138,18 @@ namespace PowerfulSign
         }
         public static void SendSignDataDirect(this TSPlayer plr, PSSign sign, bool open, int index)
         {
-            var psp = plr.PSP();
-            if (index == 0) psp.LastSignIndex = 0;
-            if (open)
+            try
             {
-                psp.VisitingSign = sign;
-                NetMessage.PlayNetSound(new NetMessage.NetSoundInfo(plr.TPlayer.position, 122, -1, 0.62f), plr.Index);
+                var psp = plr.PSP();
+                if (index == 0) psp.LastSignIndex = 0;
+                if (open)
+                {
+                    psp.VisitingSign = sign;
+                    NetMessage.PlayNetSound(new NetMessage.NetSoundInfo(plr.TPlayer.position, 122, -1, 0.62f), plr.Index);
+                }
+                if (Netplay.Clients[plr.Index].IsConnected()) plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)index).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(open ? sign.Text : sign.PromptText).PackByte((byte)plr.Index).PackByte(new BitsByte(!open)).GetByteData());
             }
-            plr.SendRawData(new RawDataBuilder(PacketTypes.SignNew).PackInt16((short)index).PackInt16((short)sign.X).PackInt16((short)sign.Y).PackString(open ? sign.Text : sign.PromptText).PackByte((byte)plr.Index).PackByte(new BitsByte(!open)).GetByteData());
+            catch (Exception ex) { TShock.Log.Error(ex.Message); }
         }
         public static void SendSignData(this TSPlayer plr, PSSign sign)
         {
@@ -256,35 +260,50 @@ namespace PowerfulSign
         {
             if (sign.ChestID != -1)
             {
-                if (sign.Inventory >= stack)
+                if (sign.Shop.UnLimit)
                 {
-                    if (plr.Balance() >= cost)
+                    if (plr.TakeMoney(cost) && UEF.MoneyUp(owner.Name, cost))
                     {
-                        if (plr.IsInventoryAviliable(item, stack))
-                        {
-                            if (plr.DelItemFromInventory(item, stack) && sign.DelItemFromChest(item, stack) && plr.TakeMoney(cost) && UEF.MoneyUp(owner.Name, cost))
-                            {
-                                plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功购买 {stack} 个 {item.Name}, 花费 {cost} {PSPlugin.Config.MoneyName}.");
-                                plr.GiveItemEX(item.type, stack, item.prefix);
-                            }
-                            else
-                            {
-                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
-                            }
-                        }
-                        else
-                        {
-                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 背包空间不足, 无法装下 {stack} 个 {item.Name}.");
-                        }
+                        plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功购买 {stack} 个 {item.Name}, 花费 {cost} {PSPlugin.Config.MoneyName}.");
+                        plr.GiveItemEX(item.type, stack, item.prefix);
                     }
                     else
                     {
-                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你的余额不足. 当前剩余 {plr.Balance()}.");
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
                     }
                 }
                 else
                 {
-                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店库存不足, 无法购买. 当前剩余: {sign.Inventory}.");
+                    if (sign.Inventory >= stack)
+                    {
+                        if (plr.Balance() >= cost)
+                        {
+                            if (plr.IsInventoryAviliable(item, stack))
+                            {
+                                if (sign.DelItemFromChest(item, stack) && plr.TakeMoney(cost) && UEF.MoneyUp(owner.Name, cost))
+                                {
+                                    plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功购买 {stack} 个 {item.Name}, 花费 {cost} {PSPlugin.Config.MoneyName}.");
+                                    plr.GiveItemEX(item.type, stack, item.prefix);
+                                }
+                                else
+                                {
+                                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
+                                }
+                            }
+                            else
+                            {
+                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 背包空间不足, 无法装下 {stack} 个 {item.Name}.");
+                            }
+                        }
+                        else
+                        {
+                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你的余额不足. 当前剩余 {plr.Balance()}.");
+                        }
+                    }
+                    else
+                    {
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店库存不足, 无法购买. 当前剩余: {sign.Inventory}.");
+                    }
                 }
             }
             else
@@ -296,34 +315,48 @@ namespace PowerfulSign
         {
             if (sign.ChestID != -1)
             {
-                if (sign.AviliableSlot >= stack)
+                if (sign.Shop.UnLimit)
                 {
-                    if (UEF.Balance(owner.Name) >= cost)
+                    if (plr.DelItemFromInventory(item, stack) && plr.GiveMoney(cost))
                     {
-                        if (plr.ItemNumInInventory(item.type, item.prefix) >= stack)
-                        {
-                            if (sign.AddItemToChest(item, stack) && plr.DelItemFromInventory(item, stack) && plr.GiveMoney(cost) && UEF.MoneyDown(owner.Name, cost))
-                            {
-                                plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功出售 {stack} 个 {item.Name}, 获得 {cost} {PSPlugin.Config.MoneyName}.");
-                            }
-                            else
-                            {
-                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
-                            }
-                        }
-                        else
-                        {
-                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未在你的背包中发现足够的 {item.Name}. 已找到 {plr.ItemNumInInventory(item.type, item.prefix)} 个.");
-                        }
+                        plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功出售 {stack} 个 {item.Name}, 获得 {cost} {PSPlugin.Config.MoneyName}.");
                     }
                     else
                     {
-                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 卖家余额不足以支付此次交易.");
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
                     }
                 }
                 else
                 {
-                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店储存空间不足, 无法装下 {stack} 个 {item.Name}. 当前剩余空间 {sign.AviliableSlot}.");
+                    if (sign.AviliableSlot >= stack)
+                    {
+                        if (UEF.Balance(owner.Name) >= cost)
+                        {
+                            if (plr.ItemNumInInventory(item.type, item.prefix) >= stack)
+                            {
+                                if (sign.AddItemToChest(item, stack) && plr.DelItemFromInventory(item, stack) && plr.GiveMoney(cost) && UEF.MoneyDown(owner.Name, cost))
+                                {
+                                    plr.SendSuccessMessage($"[C/66D093:<PowerfulSign>] 成功出售 {stack} 个 {item.Name}, 获得 {cost} {PSPlugin.Config.MoneyName}.");
+                                }
+                                else
+                                {
+                                    plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 发生错误.");
+                                }
+                            }
+                            else
+                            {
+                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 未在你的背包中发现足够的 {item.Name}. 已找到 {plr.ItemNumInInventory(item.type, item.prefix)} 个.");
+                            }
+                        }
+                        else
+                        {
+                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 卖家余额不足以支付此次交易.");
+                        }
+                    }
+                    else
+                    {
+                        plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 商店储存空间不足, 无法装下 {stack} 个 {item.Name}. 当前剩余空间 {sign.AviliableSlot}.");
+                    }
                 }
             }
             else

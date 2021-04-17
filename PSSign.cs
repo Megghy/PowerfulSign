@@ -29,6 +29,7 @@ namespace PowerfulSign
             {
                 _PromptText = null;
                 _CombatText = null;
+                if (Owner == -1) return false;
                 if (Text.Contains("\n"))
                 {
                     var lines = Text.Split("\n");
@@ -53,6 +54,7 @@ namespace PowerfulSign
                                                     var key = lines[i].Split(':')[0];
                                                     var value = lines[i].Replace(key + ":", "");
                                                     key = key.ToLower();
+                                                    key = key.Replace(" ", "");
                                                     switch (key)
                                                     {
                                                         case "item":
@@ -211,7 +213,7 @@ namespace PowerfulSign
                                         {
                                             if (lines[i].StartsWith(TShock.Config.Settings.CommandSpecifier))
                                             {
-                                                tempCommand.Commands.Add(lines[i].Remove(0, 1));
+                                                tempCommand.Commands.Add(lines[i]);
                                             }
                                             else if (lines[i].Contains(":"))
                                             {
@@ -244,6 +246,26 @@ namespace PowerfulSign
                                                             return false;
                                                         }
                                                         break;
+                                                    case "combat":
+                                                        if (owner.HasPermission("ps.use.combat"))
+                                                        {
+                                                            _CombatText = value;
+                                                        }
+                                                        else
+                                                        {
+                                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义CombatText <ps.use.prompt>, 此设置项将不会生效.");
+                                                        }
+                                                        break;
+                                                    case "prompt":
+                                                        if (owner.HasPermission("ps.use.prompt"))
+                                                        {
+                                                            _PromptText = value;
+                                                        }
+                                                        else
+                                                        {
+                                                            owner.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你没有权限自定义PromptText <ps.use.prompt>, 此设置项将不会生效.");
+                                                        }
+                                                        break;
                                                     case "color":
                                                         var color = System.Drawing.ColorTranslator.FromHtml("#FF0000");
                                                         if (System.Drawing.Color.Empty != color)
@@ -258,21 +280,24 @@ namespace PowerfulSign
                                                         }
                                                         break;
                                                     case "type":
-                                                        if (value.ToLower() == "close") {
-                                                            tempCommand.Type = PSSign_Command.CLOST;
-                                                        }
-                                                        else if (value.ToLower() == "click")
+                                                        switch (value.ToLower())
                                                         {
-                                                            tempCommand.Type = PSSign_Command.CLICK;
-                                                        }
-                                                        else
-                                                        {
-                                                            owner.SendErrorMessage($"[C/66D093:<PowerfulSign> 无效的标牌类型. 应为 click 或 close, 默认为click.");
-                                                            Error = true;
-                                                            return false;
+                                                            case "close":
+                                                                tempCommand.Type = PSSign_Command.CLOST;
+                                                                break;
+                                                            case "click":
+                                                                tempCommand.Type = PSSign_Command.CLICK;
+                                                                break;
+                                                            case "both":
+                                                                tempCommand.Type = PSSign_Command.BOTH;
+                                                                break;
+                                                            default:
+                                                                owner.SendErrorMessage($"[C/66D093:<PowerfulSign> 无效的标牌类型. 应为 click 或 close 或 both, 默认为click.");
+                                                                Error = true;
+                                                                return false;
                                                         }
                                                         break;
-                                                    case "ignoreperms":
+                                                    case "ignoreperm":
                                                     case "ignorepermission":
                                                         if (value.ToLower() == "true")
                                                         {
@@ -281,10 +306,10 @@ namespace PowerfulSign
                                                         break;
                                                 }
                                             }
-                                            Command = tempCommand;
-                                            Error = false;
-                                            return true;
                                         }
+                                        Command = tempCommand;
+                                        Error = false;
+                                        return true;
                                     }
                                     else
                                     {
@@ -347,21 +372,21 @@ namespace PowerfulSign
                     .Replace("\\n", "\n")
                     .Replace("{moneyname}", PSPlugin.Config.MoneyName)
                     .Replace("{text}", Text)
+                    .Replace("{owner}", Account.Name)
                     .Replace("{type}", Shop.Type == PSSign_Shop.SELL ? "出售" : "收购")
                     .Replace("{shop.name}", Shop.Item.Name)
                     .Replace("{shop.stack}", Shop.Stack.ToString())
                     .Replace("{shop.inventory}", Inventory.ToString())
                     .Replace("{shop.price}", Shop.Price.ToString())
-                    .Replace("{shop.text}", Text)
-                    .Replace("{shop.owner}", Account.Name)
                     ,
 
                     Types.Command => (_PromptText ?? PSPlugin.Config.DefaultPromptText.Command)
                     .Replace("\\n", "\n")
                     .Replace("{moneyname}", PSPlugin.Config.MoneyName)
                     .Replace("{text}", Text)
+                    .Replace("{owner}", Account.Name)
                     .Replace("{command.cost}", Command.Cost.ToString())
-                    .Replace("{command.cooldown}", Command.CoolDown.ToString())
+                    .Replace("{command.cooldown}", (Command.CoolDown / (double)1000).ToString("0.00"))
                     .Replace("{command.count}", Command.Commands.Count.ToString())
                     ,
                     _ => Text
@@ -394,7 +419,15 @@ namespace PowerfulSign
                     .Replace("{shop.owner}", Account.Name)
                     ,
 
-                    Types.Command => (_CombatText ?? PSPlugin.Config.DefaultCombatText.Command),
+                    Types.Command => (_CombatText ?? PSPlugin.Config.DefaultCombatText.Command).Replace("\\n", "\n")
+                    .Replace("{moneyname}", PSPlugin.Config.MoneyName)
+                    .Replace("{text}", Text)
+                    .Replace("{owner}", Account.Name)
+                    .Replace("{command.cost}", Command.Cost.ToString())
+                    .Replace("{command.cooldown}", (Command.CoolDown / (double)1000).ToString("0.00"))
+                    .Replace("{command.count}", Command.Commands.Count.ToString())
+                    ,
+
                     _ => Text
                 };
             }
@@ -593,6 +626,7 @@ namespace PowerfulSign
         }
         public const int CLICK = 0;
         public const int CLOST = 1;
+        public const int BOTH = 2;
         public int Type { get; set; }
         public bool IgnorePermissions { get; set; }
         public List<string> Commands { get; set; }

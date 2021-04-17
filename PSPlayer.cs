@@ -56,8 +56,12 @@ namespace PowerfulSign
                                 Player.SendCombatText(s.CombatText, s.Color, s.X, s.Y);
                                 combatCount.Add(s.ID, 0);
                             }
+                            if (s.Type == PSSign.Types.Command && s.Command.Type == 1)
+                            {
+                                UseCommandSign(s);
+                            }
                         });
-                        if (autorefreshCount >= PSPlugin.Config.AutoRefreshLevel)
+                        if (autorefreshCount >= PSPlugin.Config.AutoRefreshLevel && Player.Active)
                         {
                             Player.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
                             autorefreshCount = 0;
@@ -66,7 +70,7 @@ namespace PowerfulSign
 
                         if (errorCount >= 4)
                         {
-                            PSPlugin.SignList.Where(s => s.Owner == Account.ID && s.Error).ForEach(s => Player.SendCombatText($"[C/66D093:<PowerfulSign>]\n标牌无效", Color.Red, s.X, s.Y));
+                            PSPlugin.SignList.Where(s => s.Owner == Account.ID && s.Error).ForEach(s => Player.SendCombatText($"<PowerfulSign>\n标牌无效", Color.Red, s.X, s.Y));
                             errorCount = 0;
                         }
                         else autorefreshCount++;
@@ -104,7 +108,7 @@ namespace PowerfulSign
                 var time = (DateTime.Now - Player.GetData<DateTime>($"PSCommandCoolDown_{sign.ID}")).TotalMilliseconds / 1000.0;
                 if (time > sign.Command.CoolDown)
                 {
-                    Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 尚未冷却. 剩余 {sign.Command.CoolDown - time:0.00} 秒.");
+                    Player.SendCombatText($"命令标牌尚未冷却. 剩余 {sign.Command.CoolDown - time:0.00} 秒.", Color.White);
                     return;
                 }
                 else
@@ -121,7 +125,7 @@ namespace PowerfulSign
             {
                 if (UnifiedEconomyFramework.UEF.Balance(Player.Name) < sign.Command.Cost)
                 {
-                    Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 你的余额不足以支付此命令标牌使用费用.");
+                    Player.SendCombatText($"你的余额不足以支付此命令标牌使用费用.", Color.White);
                     return;
                 }
                 else UnifiedEconomyFramework.UEF.MoneyDown(Player.Name, sign.Command.Cost);

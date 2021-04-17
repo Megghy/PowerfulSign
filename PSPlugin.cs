@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
@@ -16,7 +17,7 @@ namespace PowerfulSign
         {
         }
         public override string Name => "PowerfulSgin";
-        public override Version Version => new Version(1, 0);
+        public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
         public override string Author => "Megghy";
         public override string Description => "强大的标牌增强插件.";
         #region 临时储存的各种数据
@@ -30,6 +31,10 @@ namespace PowerfulSign
         }
         public void OnPostInitialize(EventArgs args)
         {
+            if (!ServerApi.Plugins.Where(p => p.Plugin.Name == "UnifiedEconomyFramework").Any())
+            {
+                TShock.Log.ConsoleError("未检测到 UnifiedEconomyFramework 前置插件, 部分功能将无法生效.");
+            }
             DB.TryCreateTable();
             ServerApi.Hooks.NetGetData.Register(this, Net.OnGetData);
             //ServerApi.Hooks.NetSendData.Register(this, Net.OnSendData);
@@ -54,14 +59,7 @@ namespace PowerfulSign
             {
                 switch (cmd[0])
                 {
-                    case "1":
-                        plr.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
-                        break;
-                    case "check":
-                        int num = 0;
-                        SignList.ToList().Where(s => s.X >= 0 && s.X < Main.maxTilesX && s.Y >= 0 && s.Y < Main.maxTilesY && !Main.tileSign[Main.tile[s.X, s.Y].type]).ForEach(s => { SignList.Remove(s); num++; });
-                        plr.SendInfoMessage($"移除 {num} 个无效标牌数据.");
-                        break;
+                    
                 }
             }
             else

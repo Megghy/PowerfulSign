@@ -33,7 +33,7 @@ namespace PowerfulSign
             try
             {
                 PSPlugin.Config = JsonConvert.DeserializeObject<Config>(File.ReadAllText(Path.Combine(TShock.SavePath, "PowerfulSign.json")));
-                TShock.Log.ConsoleInfo($"[C/66D093:<PowerfulSign>] 成功读取配置文件.");
+                TShock.Log.ConsoleInfo($"<PowerfulSign> 成功读取配置文件.");
             }
             catch (Exception ex) { TShock.Log.Error(ex.Message); TShock.Log.ConsoleError("[C/66D093:<PowerfulSign>] 读取配置文件失败."); }
         }
@@ -52,16 +52,16 @@ namespace PowerfulSign
         public class PromptTexts
         {
             public string Normal = "{text}";
-            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.\n当前库存剩余 {shop.inventory} 个.";
-            public string Command = "这是一个命令标牌,包含 {command.count} 条命令,冷却时间 {command.cooldown} s, 使用需要耗费 {command.cost} {moneyname}.";
+            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.";
+            public string Command = "这是一个命令标牌,包含 {command.count} 条命令.\n冷却时间 {command.cooldown} s.\n使用需要耗费 {command.cost} {moneyname}.";
         }
         [JsonProperty]
         public PromptTexts DefaultPromptText = new PromptTexts();
         public class CombatTexts
         {
             public string Normal = "{text}";
-            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.";
-            public string Command = "这是一个命令标牌,包含 {command.count} 条命令,冷却时间 {command.cooldown} s, 使用需要耗费 {command.cost} {moneyname}.";
+            public string Shop = "[商店]\n{type}\n{shop.name}, 每组({shop.stack}个) {shop.price} {moneyname}.\n当前库存剩余 {shop.inventory} 个.";
+            public string Command = "这是一个命令标牌,包含 {command.count} 条命令.\n冷却时间 {command.cooldown} s.\n使用需要耗费 {command.cost} {moneyname}.";
         }
         [JsonProperty]
         public CombatTexts DefaultCombatText = new CombatTexts();

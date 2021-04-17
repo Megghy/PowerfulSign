@@ -77,6 +77,6 @@
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y $(TargetPath) D:\TShock_4.4.0\ServerPlugins</PostBuildEvent>
+    <PostBuildEvent>copy /Y $(TargetPath) D:\TShock4.5.0_Terraria1.4.2.1\ServerPlugins</PostBuildEvent>
   </PropertyGroup>
 </Project>
