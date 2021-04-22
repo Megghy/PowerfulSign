@@ -128,10 +128,11 @@ namespace PowerfulSign
         {
             try
             {
-                RunSQL($"UPDATE PowerfulSign SET Text=@0,Friends=@1,CanEdit=@2 WHERE SignID='{sign.ID}';", new object[] {
+                RunSQL($"UPDATE PowerfulSign SET Text=@0,Friends=@1,CanEdit=@2 Owner=@3 WHERE SignID='{sign.ID}';", new object[] {
                     sign.Text ?? "",
                     string.Join(",", sign.Friends),
                     sign.CanEdit ? 0 : 1,
+                    sign.Owner
                 });
             }
             catch (Exception ex)

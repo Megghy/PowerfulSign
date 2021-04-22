@@ -103,10 +103,14 @@ namespace PowerfulSign
                             if (Utils.TryGetSign(x, y, out sign) && !CheckShopText(text, plr, sign))
                             {
                                 psp.VisitingSign = null;
-                                if (sign.Owner == -1) sign.Owner = userID;
+                                if (sign.Owner == -1)
+                                {
+                                    sign.Owner = userID;
+                                    sign.Update();
+                                }
                                 if (sign.Text != text)
                                 {
-                                    if (sign.Owner == userID || sign.Owner == -1 || sign.Friends.Contains(userID) || plr.HasPermission("ps.use.edit"))
+                                    if (sign.Owner == userID || sign.Owner == -1 || sign.Friends.Contains(userID) || plr.HasPermission("ps.admin.edit"))
                                     {
                                         sign.Text = text;
                                         sign.Update();
@@ -240,31 +244,28 @@ namespace PowerfulSign
             catch (Exception ex){ TShock.Log.ConsoleError(ex.Message); }
             return false;
         }
-        public async static void OnTileEdit(object o, GetDataHandlers.TileEditEventArgs args)
+        public static void OnTileEdit(object o, GetDataHandlers.TileEditEventArgs args)
         {
             try
             {
                 if (Main.tileSign[Main.tile[args.X, args.Y].type] && args.Action == GetDataHandlers.EditAction.KillTile && args.EditData == 0)
                 {
-                    await Task.Run(() =>
+                    var plr = args.Player;
+                    if (Utils.TryGetSignByGuess(args.X, args.Y, out var s))
                     {
-                        var plr = args.Player;
-                        while (Utils.TryGetSignByGuess(args.X, args.Y, out var s))
+                        if (s.Owner != args.Player.AccountEX().ID && !plr.HasPermission("ps.admin.destroy"))
                         {
-                            if (s.Owner != args.Player.AccountEX().ID && !plr.HasPermission("ps.admin.destroy"))
-                            {
-                                plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你没有权限摧毁此标牌.");
-                                WorldGen.SquareTileFrame(args.X, args.Y);
-                                plr.SendSignData(s);
-                                args.Handled = true;
-                            }
-                            else
-                            {
-                                PSPlugin.SignList.Remove(s);
-                                Utils.DropItem(args.X, args.Y, Utils.GetItemFromTile(args.X, args.Y, Main.tile[args.X, args.Y]).Result[0]);
-                            }
+                            plr.SendErrorMessage($"[C/66D093:<PowerfulSign>] 你没有权限摧毁此标牌.");
+                            plr.SendTileSquare(s.X, s.Y, 2);
+                            plr.SendSignData(s);
+                            args.Handled = true;
                         }
-                    });
+                        else
+                        {
+                            PSPlugin.SignList.Remove(s);
+                            Utils.DropItem(args.X, args.Y, Utils.GetItemFromTile(args.X, args.Y, Main.tile[args.X, args.Y]).Result[0]);
+                        }
+                    }
                 }
             }
             catch { }

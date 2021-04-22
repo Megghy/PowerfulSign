@@ -141,7 +141,7 @@ namespace PowerfulSign
                                                             }
                                                             break;
                                                         case "color":
-                                                            var color = System.Drawing.ColorTranslator.FromHtml("#FF0000");
+                                                            var color = System.Drawing.ColorTranslator.FromHtml(value);
                                                             if (System.Drawing.Color.Empty != color)
                                                             {
                                                                 Color = new Color(color.R, color.G, color.B);
@@ -267,7 +267,7 @@ namespace PowerfulSign
                                                         }
                                                         break;
                                                     case "color":
-                                                        var color = System.Drawing.ColorTranslator.FromHtml("#FF0000");
+                                                        var color = System.Drawing.ColorTranslator.FromHtml(value);
                                                         if (System.Drawing.Color.Empty != color)
                                                         {
                                                             Color = new Color(color.R, color.G, color.B);
