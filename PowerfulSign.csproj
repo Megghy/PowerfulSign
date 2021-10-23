@@ -66,12 +66,16 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Config.cs" />
-    <Compile Include="DB.cs" />
-    <Compile Include="Net.cs" />
-    <Compile Include="PSPlayer.cs" />
+    <Compile Include="Data.cs" />
+    <Compile Include="Models\ComandSign.cs" />
+    <Compile Include="Models\ShopSign.cs" />
+    <Compile Include="Core\DB.cs" />
+    <Compile Include="Models\SignBase.cs" />
+    <Compile Include="Core\Net.cs" />
+    <Compile Include="Core\PowerfulSignAPI.cs" />
+    <Compile Include="Core\PSPlayer.cs" />
     <Compile Include="PSPlugin.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="PSSign.cs" />
     <Compile Include="RawDataBuilder.cs" />
     <Compile Include="Utils.cs" />
   </ItemGroup>

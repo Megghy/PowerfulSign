@@ -1,9 +1,5 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using Newtonsoft.Json;
 using TShockAPI;
 using TShockAPI.Hooks;
@@ -12,30 +8,31 @@ namespace PowerfulSign
 {
     public class Config
     {
-        public void Load(ReloadEventArgs args = null)
+        private static Config _instance;
+        public static Config Instance
         {
-            if (!File.Exists(Path.Combine(TShock.SavePath, "PowerfulSign.json")))
+            get
             {
-                JsonSerializer serializer = new JsonSerializer();
-                TextReader tr = new StringReader(JsonConvert.SerializeObject(PSPlugin.Config));
-                JsonTextReader jtr = new JsonTextReader(tr);
-                object obj = serializer.Deserialize(jtr);
-                StringWriter textWriter = new StringWriter();
-                JsonTextWriter jsonWriter = new JsonTextWriter(textWriter)
-                {
-                    Formatting = Formatting.Indented,//格式化缩进
-                    Indentation = 4,  //缩进四个字符
-                    IndentChar = ' '  //缩进的字符是空格
-                };
-                serializer.Serialize(jsonWriter, obj);
-                FileTools.CreateIfNot(Path.Combine(TShock.SavePath, "PowerfulSign.json"), textWriter.ToString());
+                _instance ??= Read();
+                return _instance;
             }
+        }
+        public static Config Read(ReloadEventArgs args = null)
+        {
+            _instance = null;
+            if (!File.Exists(Path.Combine(TShock.SavePath, "PowerfulSign.json")))
+                FileTools.CreateIfNot(Path.Combine(TShock.SavePath, "PowerfulSign.json"), JsonConvert.SerializeObject(new(), Formatting.Indented));
             try
             {
-                PSPlugin.Config = JsonConvert.DeserializeObject<Config>(File.ReadAllText(Path.Combine(TShock.SavePath, "PowerfulSign.json")));
                 TShock.Log.ConsoleInfo($"<PowerfulSign> 成功读取配置文件.");
+                return JsonConvert.DeserializeObject<Config>(File.ReadAllText(Path.Combine(TShock.SavePath, "PowerfulSign.json")));
             }
-            catch (Exception ex) { TShock.Log.Error(ex.Message); TShock.Log.ConsoleError("[C/66D093:<PowerfulSign>] 读取配置文件失败."); }
+            catch (Exception ex)
+            {
+                TShock.Log.Error(ex.Message);
+                TShock.Log.ConsoleError("读取配置文件失败.");
+                return null;
+            }
         }
         [JsonProperty]
         public string MoneyName = "$";

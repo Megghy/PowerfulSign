@@ -1,11 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using PowerfulSign.Core;
 using Terraria;
 using TerrariaApi.Server;
 using TShockAPI;
-using TShockAPI.DB;
 using TShockAPI.Hooks;
 
 namespace PowerfulSign
@@ -20,14 +19,9 @@ namespace PowerfulSign
         public override Version Version => Assembly.GetExecutingAssembly().GetName().Version;
         public override string Author => "Megghy";
         public override string Description => "强大的标牌增强插件.";
-        #region 临时储存的各种数据
-        public static Config Config = new Config();
-        public static List<PSSign> SignList = new List<PSSign>();
-        #endregion
         public override void Initialize()
         {
             ServerApi.Hooks.GamePostInitialize.Register(this, OnPostInitialize);
-            Config.Load();
         }
         public void OnPostInitialize(EventArgs args)
         {
@@ -40,11 +34,11 @@ namespace PowerfulSign
             //ServerApi.Hooks.NetSendData.Register(this, Net.OnSendData);
             ServerApi.Hooks.NetGreetPlayer.Register(this, (GreetPlayerEventArgs g) =>
             {
-                if(!TShock.Players[g.Who].ContainsData("PSPlayer")) TShock.Players[g.Who].SetData<PSPlayer>("PSPlayer", new PSPlayer(TShock.Players[g.Who]));
+                if (!TShock.Players[g.Who].ContainsData("PSPlayer")) TShock.Players[g.Who].SetData<PSPlayer>("PSPlayer", new PSPlayer(TShock.Players[g.Who]));
             });
             ServerApi.Hooks.ServerLeave.Register(this, (LeaveEventArgs l) => TShock.Players[l.Who].RemoveData("PSPlayer"));
             GetDataHandlers.TileEdit += Net.OnTileEdit;
-            GeneralHooks.ReloadEvent += (ReloadEventArgs r) => { Config.Load(); DB.GetAllSign(); };
+            GeneralHooks.ReloadEvent += (ReloadEventArgs r) => { Config.Read(); DB.GetAllSign(); };
             Commands.ChatCommands.Add(new Command("ps.use", OnCommand, new string[] { "ps", "标牌" }));
         }
         protected override void Dispose(bool disposing)
@@ -59,7 +53,11 @@ namespace PowerfulSign
             {
                 switch (cmd[0])
                 {
-                    
+                    case "check":
+                        int num = 0;
+                        Data.Signs.ToList().Where(s => s.X >= 0 && s.X < Main.maxTilesX && s.Y >= 0 && s.Y < Main.maxTilesY && !Main.tileSign[Main.tile[s.X, s.Y].type]).ForEach(s => { Data.Signs.Remove(s); num++; });
+                        plr.SendInfoMessage($"移除 {num} 个无效标牌数据.");
+                        break;
                 }
             }
             else

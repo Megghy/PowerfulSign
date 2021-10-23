@@ -2,19 +2,20 @@
 using System.Collections.Generic;
 using System.Data;
 using System.Linq;
+using PowerfulSign.Models;
 using Terraria;
 using TShockAPI;
 using TShockAPI.DB;
 
-namespace PowerfulSign
+namespace PowerfulSign.Core
 {
-    class DB
+    public class DB
     {
         public static void TryCreateTable()
         {
             try
             {
-                SqlTable sqlTable = new SqlTable("PowerfulSign", new SqlColumn[]
+                SqlTable sqlTable = new("PowerfulSign", new SqlColumn[]
                 {
                     new SqlColumn("SignID", MySql.Data.MySqlClient.MySqlDbType.Int32)
                     {
@@ -51,7 +52,9 @@ namespace PowerfulSign
         {
             if (RunSQL($"SELECT * FROM PowerfulSign WHERE WorldID='{Main.worldID}'").Read())
             {
-                GetAllSign();
+                TShock.Log.ConsoleInfo($"<PowerfulSign> 正在读入标牌数据...");
+                Data.Signs = GetAllSign();
+                TShock.Log.ConsoleInfo($"<PowerfulSign> 载入 {Data.Signs.Count} 条标牌数据.");
                 return true;
             }
             else
@@ -64,11 +67,10 @@ namespace PowerfulSign
         {
             return args == null ? DbExt.QueryReader(TShock.DB, sql) : DbExt.QueryReader(TShock.DB, sql, args);
         }
-        public static List<PSSign> GetAllSign()
+        public static List<SignBase> GetAllSign()
         {
-            TShock.Log.ConsoleInfo($"<PowerfulSign> 正在读入标牌数据...");
             var reader = RunSQL($"SELECT * FROM PowerfulSign WHERE WorldID='{Main.worldID}';");
-            var list = new List<PSSign>();
+            var list = new List<SignBase>();
             while (reader.Read())
             {
                 try
@@ -77,22 +79,18 @@ namespace PowerfulSign
                     var friendsList = new List<int>();
                     if (friends.Contains(",")) friends.Split(',').ForEach(f => friendsList.Add(int.Parse("f")));
                     else if (int.TryParse(friends, out int i)) friendsList.Add(i);
-                    list.Add(new PSSign(reader.Get<int>("Owner"), friendsList, reader.Get<int>("X"), reader.Get<int>("Y"), reader.Get<string>("Text"), reader.Get<int>("SignID"), reader.Get<int>("CanEdit") == 0));
+                    list.Add(new(reader.Get<int>("SignID"), reader.Get<int>("X"), reader.Get<int>("Y"), reader.Get<string>("Text"), reader.Get<int>("Owner"), friendsList, reader.Get<int>("CanEdit") == 0));
                 }
                 catch (Exception ex) { TShock.Log.ConsoleError(ex.Message); }
             }
-            PSPlugin.SignList = list;
-            TShock.Log.ConsoleInfo($"<PowerfulSign> 载入 {PSPlugin.SignList.Count} 条标牌数据.");
             return list;
         }
-        public static int AddSign(PSSign sign)
+        public static SignBase AddSign(SignBase sign)
         {
             try
             {
-                if (Utils.TryGetSign(sign.X, sign.Y, out var temp))
-                {
-                    return -1;
-                }
+                if (PowerfulSignAPI.TryGetSign(sign.X, sign.Y, out var temp))
+                    return temp;
                 using (RunSQL($"INSERT INTO PowerfulSign (Owner,Friends,X,Y,Text,CanEdit,WorldID) VALUES (@0,@1,@2,@3,@4,@5,@6)", new object[] {
                     sign.Owner,
                     string.Join(",", sign.Friends),
@@ -101,34 +99,37 @@ namespace PowerfulSign
                     sign.Text ?? "",
                     sign.CanEdit ? 0 : 1,
                     Main.worldID
-                })) { }
+                })) ;
                 using (var reader = RunSQL($"SELECT MAX(SignID) FROM PowerfulSign;"))
                 {
                     reader.Read();
                     sign.ID = reader.Get<int>("MAX(SignID)");
-                    PSPlugin.SignList.Add(sign);
-                    return sign.ID;
+                    if (!Data.Signs.Any(s => s.ID == sign.ID))
+                        Data.Signs.Add(sign);
+                    return sign;
                 }
             }
             catch (Exception ex)
             {
-                TShock.Log.ConsoleError(ex.InnerException == null ? ex.Message : ex.InnerException.Message);
-                return -1;
+                TShock.Log.ConsoleError(ex.InnerException is null ? ex.Message : ex.InnerException.Message);
+                return null;
             }
         }
-        public static void DelSign(PSSign sign)
-        {
-            try {
-                RunSQL($"DELETE FROM PowerfulSign WHERE SignID={sign.ID};");
-                PSPlugin.SignList.Remove(sign);
-            }
-            catch { }
-        }
-        public static void UpdateSign(PSSign sign)
+        public static void DelSign(Models.SignBase sign)
         {
             try
             {
-                RunSQL($"UPDATE PowerfulSign SET Text=@0,Friends=@1,CanEdit=@2 Owner=@3 WHERE SignID='{sign.ID}';", new object[] {
+                RunSQL($"DELETE FROM PowerfulSign WHERE SignID={sign.ID};");
+                if (Data.Signs.Any(s => s.ID == sign.ID))
+                    Data.Signs.Remove(sign);
+            }
+            catch { }
+        }
+        public static void UpdateSign(Models.SignBase sign)
+        {
+            try
+            {
+                RunSQL($"UPDATE PowerfulSign SET Text=@0,Friends=@1,CanEdit=@2,Owner=@3 WHERE SignID='{sign.ID}';", new object[] {
                     sign.Text ?? "",
                     string.Join(",", sign.Friends),
                     sign.CanEdit ? 0 : 1,

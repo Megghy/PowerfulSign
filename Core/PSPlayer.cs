@@ -6,7 +6,7 @@ using Microsoft.Xna.Framework;
 using TShockAPI;
 using TShockAPI.DB;
 
-namespace PowerfulSign
+namespace PowerfulSign.Core
 {
     public class PSPlayer
     {
@@ -18,11 +18,11 @@ namespace PowerfulSign
         TSPlayer Player { get; set; }
         UserAccount Account { get { return Player.Account ?? new UserAccount() { ID = -2 }; } }
         public int LastSignIndex;
-        public PSSign VisitingSign;
+        public Models.SignBase VisitingSign;
 
-        PSSign _WannaTrade;
+        Models.ShopSign _WannaTrade;
         int TradeTimer = 0;
-        public PSSign WannaTrade
+        public Models.ShopSign WannaTrade
         {
             get
             {
@@ -47,37 +47,37 @@ namespace PowerfulSign
                     try
                     {
                         var position = Player.TPlayer.position;
-                        var combatrect = new Rectangle((int)(position.X / 16 - PSPlugin.Config.CombatTextRange), (int)(position.Y / 16 - PSPlugin.Config.CombatTextRange), 2 + PSPlugin.Config.CombatTextRange * 2, 2 + PSPlugin.Config.CombatTextRange * 2);
-                        if (VisitingSign != null && !new Rectangle(VisitingSign.X, VisitingSign.Y, 2, 2).Intersects(new Rectangle((int)(position.X / 16 - 5), (int)(position.Y / 16 - 5), 2 + PSPlugin.Config.CombatTextRange * 12, 12))) VisitingSign = null; //超出范围则未在编辑标牌.
-                        PSPlugin.SignList.Where(s => combatrect.Intersects(new Rectangle(s.X, s.Y, 2, 2))).ForEach(s =>
+                        var combatrect = new Rectangle((int)(position.X / 16 - Config.Instance.CombatTextRange), (int)(position.Y / 16 - Config.Instance.CombatTextRange), 2 + Config.Instance.CombatTextRange * 2, 2 + Config.Instance.CombatTextRange * 2);
+                        if (VisitingSign != null && !new Rectangle(VisitingSign.X, VisitingSign.Y, 2, 2).Intersects(new Rectangle((int)(position.X / 16 - 5), (int)(position.Y / 16 - 5), 2 + Config.Instance.CombatTextRange * 12, 12))) VisitingSign = null; //超出范围则未在编辑标牌.
+                        Data.Signs.Where(s => combatrect.Intersects(new Rectangle(s.X, s.Y, 2, 2))).ForEach(s =>
                         {
                             if (!combatCount.ContainsKey(s.ID))
                             {
                                 Player.SendCombatText(s.CombatText, s.Color, s.X, s.Y);
                                 combatCount.Add(s.ID, 0);
                             }
-                            if (s.Type == PSSign.Types.Command && s.Command.Type == 1)
+                            if (s.To<Models.ComandSign>() is { } cmdSign)
                             {
-                                UseCommandSign(s);
+                                UseCommandSign(cmdSign);
                             }
                         });
-                        if (autorefreshCount >= PSPlugin.Config.AutoRefreshLevel && Player.Active)
+                        if (autorefreshCount >= Config.Instance.AutoRefreshLevel && Player.Active)
                         {
-                            Player.SendSignDataInCircle(PSPlugin.Config.RefreshRadius);
+                            Player.SendSignDataInCircle(Config.Instance.RefreshRadius);
                             autorefreshCount = 0;
                         }
                         else autorefreshCount++;
 
                         if (errorCount >= 4)
                         {
-                            PSPlugin.SignList.Where(s => s.Owner == Account.ID && s.Error).ForEach(s => Player.SendCombatText($"<PowerfulSign>\n标牌无效", Color.Red, s.X, s.Y));
+                            Data.Signs.Where(s => s.Owner == Account.ID && s.HasError).ForEach(s => Player.SendCombatText($"<PowerfulSign>\n标牌无效", Color.Red, s.X, s.Y));
                             errorCount = 0;
                         }
                         else autorefreshCount++;
 
                         foreach (var item in combatCount.ToList())
                         {
-                            if (combatCount[item.Key] >= PSPlugin.Config.CombatTextSendLevel) combatCount.Remove(item.Key);
+                            if (combatCount[item.Key] >= Config.Instance.CombatTextSendLevel) combatCount.Remove(item.Key);
                             else combatCount[item.Key]++;
                         }
 
@@ -86,7 +86,7 @@ namespace PowerfulSign
                             if (TradeTimer < 10) TradeTimer++;
                             else
                             {
-                                Player.SendInfoMessage($"[C/66D093:<PowerfulSign>] 购买/出售请求已超时.");
+                                Player.SendInfoMessage($"购买/出售请求已超时.");
                                 _WannaTrade = null;
                                 TradeTimer = 0;
                             }
@@ -101,14 +101,14 @@ namespace PowerfulSign
                 }
             });
         }
-        public void UseCommandSign(PSSign sign)
+        public void UseCommandSign(Models.ComandSign sign)
         {
             if (Player.ContainsData($"PSCommandCoolDown_{sign.ID}"))
             {
                 var time = (DateTime.Now - Player.GetData<DateTime>($"PSCommandCoolDown_{sign.ID}")).TotalMilliseconds / 1000.0;
-                if (time > sign.Command.CoolDown)
+                if (time > sign.CoolDown)
                 {
-                    Player.SendCombatText($"命令标牌尚未冷却. 剩余 {sign.Command.CoolDown - time:0.00} 秒.", Color.White);
+                    Player.SendCombatText($"命令标牌尚未冷却. 剩余 {sign.CoolDown - time:0.0} 秒.", Color.White);
                     return;
                 }
                 else
@@ -121,18 +121,19 @@ namespace PowerfulSign
                 Player.SetData($"PSCommandCoolDown_{sign.ID}", DateTime.Now);
                 return;
             }
-            if (sign.Command.Cost != 0)
+            if (sign.Cost != 0)
             {
-                if (UnifiedEconomyFramework.UEF.Balance(Player.Name) < sign.Command.Cost)
+                if (UnifiedEconomyFramework.UEF.Balance(Player.Name) < sign.Cost)
                 {
                     Player.SendCombatText($"你的余额不足以支付此命令标牌使用费用.", Color.White);
                     return;
                 }
-                else UnifiedEconomyFramework.UEF.MoneyDown(Player.Name, sign.Command.Cost);
+                else UnifiedEconomyFramework.UEF.MoneyDown(Player.Name, sign.Cost);
             }
             var group = Player.Group;
-            if (sign.Command.IgnorePermissions) Player.Group = new SuperAdminGroup();
-            sign.Command.Commands.ForEach(c =>
+            if (sign.IgnorePermissions)
+                Player.Group = new SuperAdminGroup();
+            sign.Commands.ForEach(c =>
             {
                 Commands.HandleCommand(Player, c.Replace("{name}", Player.Name));
             });
